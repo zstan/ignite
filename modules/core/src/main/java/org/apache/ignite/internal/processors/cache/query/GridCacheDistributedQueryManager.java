@@ -43,7 +43,6 @@ import org.apache.ignite.internal.util.lang.GridCloseableIterator;
 import org.apache.ignite.internal.util.typedef.CI1;
 import org.apache.ignite.internal.util.typedef.CI2;
 import org.apache.ignite.internal.util.typedef.F;
-import org.apache.ignite.internal.util.typedef.T1;
 import org.apache.ignite.internal.util.typedef.X;
 import org.apache.ignite.internal.util.typedef.internal.S;
 import org.apache.ignite.internal.util.typedef.internal.U;
@@ -53,7 +52,6 @@ import org.apache.ignite.lang.IgniteFuture;
 import org.apache.ignite.lang.IgniteReducer;
 import org.jetbrains.annotations.Nullable;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicReference;
 
 import static org.apache.ignite.cache.CacheMode.LOCAL;
 import static org.apache.ignite.events.EventType.EVT_NODE_FAILED;
@@ -621,6 +619,8 @@ public class GridCacheDistributedQueryManager<K, V> extends GridCacheQueryManage
 
         return new GridCloseableIteratorAdapter() {
 
+            GridCloseableIterator locIter00 = locIter;
+
             CacheQueryFuture fut = queryDistributed(bean, nodes0);
             /** */
             private Object cur;
@@ -640,11 +640,46 @@ public class GridCacheDistributedQueryManager<K, V> extends GridCacheQueryManage
                 if (cur != null)
                     return true;
 
-                if (locIter != null && locIter.hasNextX())
-                    cur = locIter.nextX();
+                if (locIter00 != null && locIter00.hasNextX())
+                    cur = locIter00.nextX();
 
-                if (X.hasCause(fut.error(), ClusterTopologyCheckedException.class))
-                    fut = queryDistributed(bean, qry.nodes());
+                if (X.hasCause(fut.error(), ClusterTopologyCheckedException.class)) {
+                    if (locIter00 != null)
+                        locIter00.close();
+                    // ** hack */
+
+                    Collection<ClusterNode> nodes00 = null;
+
+                    GridCloseableIterator locIter0 = null;
+
+                    Collection<ClusterNode> nodes = new ArrayList<>(qry.nodes());
+
+                    for (ClusterNode node : nodes) {
+                        if (node.isLocal()) {
+                            locIter0 = scanQueryLocal(qry, false);
+
+                            Collection<ClusterNode> rmtNodes = new ArrayList<>(nodes.size() - 1);
+
+                            for (ClusterNode n : nodes) {
+                                // Equals by reference can be used here.
+                                if (n != node)
+                                    rmtNodes.add(n);
+                            }
+
+                            nodes00 = rmtNodes;
+
+                            break;
+                        }
+                    }
+
+                    locIter00 = locIter0;
+
+                    if (locIter00 != null && locIter00.hasNextX())
+                        cur = locIter00.nextX();
+
+                    // ** */
+                    fut = queryDistributed(bean, nodes00);
+                }
 
                 return cur != null || (cur = convert(fut.next())) != null;
             }
@@ -665,8 +700,8 @@ public class GridCacheDistributedQueryManager<K, V> extends GridCacheQueryManage
             @Override protected void onClose() throws IgniteCheckedException {
                 super.onClose();
 
-                if (locIter != null)
-                    locIter.close();
+                if (locIter00 != null)
+                    locIter00.close();
 
                 if (fut != null)
                     fut.cancel();
