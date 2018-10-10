@@ -378,7 +378,7 @@ public abstract class GridCacheSetFailoverAbstractSelfTest extends IgniteCollect
 
                 startGrid(idx);
 
-                //waitForRemoteNodes(grid(0), 3);
+                waitForRemoteNodes(grid(0), 3);
 
                 set.close();
 
