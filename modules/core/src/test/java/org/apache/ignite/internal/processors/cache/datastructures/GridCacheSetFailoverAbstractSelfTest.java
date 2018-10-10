@@ -272,15 +272,10 @@ public abstract class GridCacheSetFailoverAbstractSelfTest extends IgniteCollect
         try {
             ThreadLocalRandom rnd = ThreadLocalRandom.current();
 
-            for (int i = 0; i < 2; i++) {
-                try {
-                    int size = set.size();
+            for (int i = 0; i < 10; i++) {
+                int size = set.size();
 
-                    assertTrue(size == ITEMS);
-                }
-                catch (IgniteException ignore) {
-                    // No-op.
-                }
+                assertTrue(size == ITEMS);
 
                 Iterator<Integer> iter = set.iterator();
 
@@ -290,8 +285,6 @@ public abstract class GridCacheSetFailoverAbstractSelfTest extends IgniteCollect
 
                 srvDown.await();
 
-                System.err.println("remote nodes: " + grid(0).cluster().forRemotes().nodes().size());
-
                 while (iter.hasNext()) {
                     assertNotNull(iter.next());
 
@@ -299,10 +292,6 @@ public abstract class GridCacheSetFailoverAbstractSelfTest extends IgniteCollect
                 }
 
                 srvCanUp.await();
-
-                System.err.println("remote nodes: " + grid(0).cluster().forRemotes().nodes().size());
-
-                System.err.println("expect: " + ITEMS + " current: " + cnt);
 
                 assertTrue("expect: " + ITEMS + " current: " + cnt, cnt == ITEMS);
 
@@ -316,7 +305,7 @@ public abstract class GridCacheSetFailoverAbstractSelfTest extends IgniteCollect
 
                 log.info("Remove set.");
 
-                //set.close();
+                set.close();
 
                 log.info("Create new set.");
 
@@ -363,30 +352,21 @@ public abstract class GridCacheSetFailoverAbstractSelfTest extends IgniteCollect
 
         CyclicBarrier srvCanDown = new CyclicBarrier(2);
 
-        IgniteInternalFuture<?> killFut = startNodeKiller(stop, srvCanDown, srvDown, srvCanUp);
+        //IgniteInternalFuture<?> killFut = startNodeKiller(stop, srvCanDown, srvDown, srvCanUp);
 
         try {
             ThreadLocalRandom rnd = ThreadLocalRandom.current();
 
             for (int i = 0; i < 10; i++) {
-                try {
-                    int size = set.size();
+                int size = set.size();
 
-                    assertTrue(size == ITEMS);
-                }
-                catch (IgniteException ignore) {
-                    // No-op.
-                }
+                assertTrue(size == ITEMS);
 
-                srvCanDown.await();
+                int idx = rnd.nextInt(1, gridCount());
 
-                srvDown.await();
+                log.info("Killing node: " + idx);
 
-                System.err.println(i + " !remote nodes: " + grid(0).cluster().forRemotes().nodes().size());
-
-                srvCanUp.await();
-
-                System.err.println(i+ " !remote nodes: " + grid(0).cluster().forRemotes().nodes().size());
+                stopGrid(idx);
 
                 int val = rnd.nextInt(ITEMS);
 
@@ -396,22 +376,30 @@ public abstract class GridCacheSetFailoverAbstractSelfTest extends IgniteCollect
 
                 assertFalse("Contains: " + val, set.contains(val));
 
-                srvCanDown.reset();
+                startGrid(idx);
 
-                srvDown.reset();
+                //waitForRemoteNodes(grid(0), 3);
+
+                set.close();
+
+                log.info("Create new set.");
+
+                set = grid(0).set(SET_NAME, config(false));
+
+                set.addAll(items);
             }
         }
         finally {
             stop.set(true);
 
-            //set.close();
+            set.close();
 
-            stopAllServers(true);
+            //stopAllServers(true);
 
-            //stopAllGrids();
+            stopAllGrids();
         }
 
-        killFut.get();
+        //killFut.get();
     }
 
     /**
