@@ -364,7 +364,7 @@ public abstract class GridCacheSetFailoverAbstractSelfTest extends IgniteCollect
         try {
             ThreadLocalRandom rnd = ThreadLocalRandom.current();
 
-            for (int i = 0; i < 20; i++) {
+            for (int i = 0; i < 10; i++) {
                 try {
                     int size = set.size();
 
@@ -374,19 +374,15 @@ public abstract class GridCacheSetFailoverAbstractSelfTest extends IgniteCollect
                     // No-op.
                 }
 
-                Iterator<Integer> iter = set.iterator();
-
-                int cnt = 0;
-
                 srvCanDown.await();
 
                 srvDown.await();
 
-                System.err.println("remote nodes: " + grid(0).cluster().forRemotes().nodes().size());
+                System.err.println(i + " !remote nodes: " + grid(0).cluster().forRemotes().nodes().size());
 
                 srvCanUp.await();
 
-                System.err.println("remote nodes: " + grid(0).cluster().forRemotes().nodes().size());
+                System.err.println(i+ " !remote nodes: " + grid(0).cluster().forRemotes().nodes().size());
 
                 int val = rnd.nextInt(ITEMS);
 
@@ -399,23 +395,15 @@ public abstract class GridCacheSetFailoverAbstractSelfTest extends IgniteCollect
                 srvCanDown.reset();
 
                 srvDown.reset();
-
-                log.info("Remove set.");
-
-                //set.close();
-
-                log.info("Create new set.");
-
-                //set = grid(0).set(SET_NAME, config(false));
-
-                //set.addAll(items);
             }
         }
         finally {
-            stop.set(true);
-        }
+            //stop.set(true);
 
-        set.close();
+            //set.close();
+
+            stopAllGrids();
+        }
 
         killFut.cancel();
     }
@@ -442,7 +430,7 @@ public abstract class GridCacheSetFailoverAbstractSelfTest extends IgniteCollect
 
                     log.info("Killing node: " + idx);
 
-                    stopGrid(getTestIgniteInstanceName(idx), false, true);
+                    stopGrid(getTestIgniteInstanceName(idx), true, true);
 
                     if (srvCanDown != null)
                         srvDown.await();
