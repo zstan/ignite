@@ -79,7 +79,7 @@ public abstract class GridCacheSetFailoverAbstractSelfTest extends IgniteCollect
 
     /** {@inheritDoc} */
     @Override protected void afterTest() throws Exception {
-        stopAllGrids();
+        //stopAllGrids();
     }
 
     /** {@inheritDoc} */
@@ -272,7 +272,7 @@ public abstract class GridCacheSetFailoverAbstractSelfTest extends IgniteCollect
         try {
             ThreadLocalRandom rnd = ThreadLocalRandom.current();
 
-            for (int i = 0; i < 10; i++) {
+            for (int i = 0; i < 2; i++) {
                 try {
                     int size = set.size();
 
@@ -314,26 +314,30 @@ public abstract class GridCacheSetFailoverAbstractSelfTest extends IgniteCollect
 
                 assertFalse("Contains: " + val, set.contains(val));
 
-                srvCanDown.reset();
-
-                srvDown.reset();
-
                 log.info("Remove set.");
 
-                set.close();
+                //set.close();
 
                 log.info("Create new set.");
 
-                set = grid(0).set(SET_NAME, config(false));
+                //set = grid(0).set(SET_NAME, config(false));
 
                 set.addAll(items);
+
+/*                srvCanDown.reset();
+
+                srvDown.reset();
+
+                srvCanUp.reset();*/
             }
         }
         finally {
             stop.set(true);
-        }
 
-        set.close();
+            //set.close();
+
+            stopAllServers(true);
+        }
 
         killFut.cancel();
     }
@@ -398,14 +402,16 @@ public abstract class GridCacheSetFailoverAbstractSelfTest extends IgniteCollect
             }
         }
         finally {
-            //stop.set(true);
+            stop.set(true);
 
             //set.close();
 
-            stopAllGrids();
+            stopAllServers(true);
+
+            //stopAllGrids();
         }
 
-        killFut.cancel();
+        killFut.get();
     }
 
     /**
@@ -430,18 +436,18 @@ public abstract class GridCacheSetFailoverAbstractSelfTest extends IgniteCollect
 
                     log.info("Killing node: " + idx);
 
-                    stopGrid(getTestIgniteInstanceName(idx), true, true);
+                    stopGrid(idx);
+
+                    U.sleep(500);
 
                     if (srvCanDown != null)
                         srvDown.await();
 
-                    //U.sleep(rnd.nextLong(500, 1000));
-
                     srvCanUp.await();
 
-                    startGrid(idx);
+                    log.info("Starting node: " + idx);
 
-                    srvCanUp.reset();
+                    startGrid(idx);
                 }
 
                 return null;
