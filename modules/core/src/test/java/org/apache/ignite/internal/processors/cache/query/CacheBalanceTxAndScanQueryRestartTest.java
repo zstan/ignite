@@ -296,26 +296,44 @@ public class CacheBalanceTxAndScanQueryRestartTest extends GridCommonAbstractTes
             lock.writeLock().lock();
 
         try {
-            List<IgniteFuture<Long>> futs = new ArrayList<>();
+            for (int retry = 0; retry < 10; retry++) {
+                List<IgniteFuture<Long>> futs = new ArrayList<>();
 
-            for (int i = 0; i < CACHES; i++) {
-                String cacheName = cacheName(i);
+                for (int i = 0; i < CACHES; i++) {
+                    String cacheName = cacheName(i);
 
-                int parts = clientNode.affinity(cacheName).partitions();
+                    int parts = clientNode.affinity(cacheName).partitions();
 
-                for (int p = 0; p < parts; p++) {
-                    assertEquals(p, clientNode.affinity(cacheName).partition(p));
+                    for (int p = 0; p < parts; p++) {
+                        assertEquals(p, clientNode.affinity(cacheName).partition(p));
 
-                    futs.add(clientNode.compute().affinityCallAsync(cacheName, p, new CacheSumTask(cacheName, p)));
+                        futs.add(clientNode.compute().affinityCallAsync(cacheName, p, new CacheSumTask(cacheName, p)));
+                    }
+                }
+
+                long total = 0;
+
+                boolean err = false;
+
+                for (IgniteFuture<Long> fut : futs) {
+                    try {
+                        total += fut.get();
+                    }
+                    catch (Exception e) {
+                        if (!err) {
+                            err = true;
+
+                            info("AffinityCall error: " +  e);
+                        }
+                    }
+                }
+
+                if (!err) {
+                    assertEquals(CACHES * KEYS * START_VAL, total);
+
+                    break;
                 }
             }
-
-            long total = 0;
-
-            for (IgniteFuture<Long> fut : futs)
-                total += fut.get();
-
-            assertEquals(CACHES * KEYS * START_VAL, total);
         }
         finally {
             if (lock != null)
