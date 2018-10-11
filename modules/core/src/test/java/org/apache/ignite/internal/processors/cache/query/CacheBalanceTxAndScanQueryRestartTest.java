@@ -277,6 +277,9 @@ public class CacheBalanceTxAndScanQueryRestartTest extends GridCommonAbstractTes
                             tx.commit();
                         }
                     }
+                    catch (Exception e) {
+                        info("Cache update error: " + e);
+                    }
                     finally {
                         lock.readLock().unlock();
                     }
