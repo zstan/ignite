@@ -30,7 +30,10 @@ import org.apache.ignite.IgniteCache;
 import org.apache.ignite.IgniteDataStreamer;
 import org.apache.ignite.cache.query.ScanQuery;
 import org.apache.ignite.configuration.CacheConfiguration;
+import org.apache.ignite.configuration.DataRegionConfiguration;
+import org.apache.ignite.configuration.DataStorageConfiguration;
 import org.apache.ignite.configuration.IgniteConfiguration;
+import org.apache.ignite.configuration.WALMode;
 import org.apache.ignite.internal.IgniteInternalFuture;
 import org.apache.ignite.internal.IgniteKernal;
 import org.apache.ignite.internal.processors.affinity.AffinityTopologyVersion;
@@ -48,7 +51,7 @@ import org.jetbrains.annotations.Nullable;
 
 import static org.apache.ignite.cache.CacheAtomicityMode.TRANSACTIONAL;
 import static org.apache.ignite.cache.CacheMode.PARTITIONED;
-import static org.apache.ignite.cache.CacheRebalanceMode.SYNC;
+import static org.apache.ignite.cache.CacheRebalanceMode.ASYNC;
 import static org.apache.ignite.cache.CacheWriteSynchronizationMode.FULL_SYNC;
 import static org.apache.ignite.transactions.TransactionConcurrency.PESSIMISTIC;
 import static org.apache.ignite.transactions.TransactionIsolation.REPEATABLE_READ;
@@ -58,7 +61,7 @@ import static org.apache.ignite.transactions.TransactionIsolation.REPEATABLE_REA
  */
 public class CacheBalanceTxAndScanQueryRestartTest extends GridCommonAbstractTest {
     /** */
-    private static final int CACHES = 1;
+    private static final int CACHES = 3;
 
     /** */
     private static final int START_VAL = 100;
@@ -67,7 +70,7 @@ public class CacheBalanceTxAndScanQueryRestartTest extends GridCommonAbstractTes
     private static final int SRV_NODES = 3;
 
     /** */
-    private static final int KEYS = 100;
+    private static final int KEYS = 5000;
 
     /** */
     private static final int TX_THREADS = 1;
@@ -78,6 +81,18 @@ public class CacheBalanceTxAndScanQueryRestartTest extends GridCommonAbstractTes
     /** {@inheritDoc} */
     @Override protected IgniteConfiguration getConfiguration(String gridName) throws Exception {
         IgniteConfiguration cfg = super.getConfiguration(gridName);
+
+        cfg.setConsistentId(gridName);
+
+        if (persistence()) {
+            DataStorageConfiguration memCfg = new DataStorageConfiguration()
+                    .setDefaultDataRegionConfiguration(
+                            new DataRegionConfiguration().setMaxSize(100L * 1024 * 1024).setPersistenceEnabled(true))
+                    .setPageSize(1024)
+                    .setWalMode(WALMode.LOG_ONLY);
+
+            cfg.setDataStorageConfiguration(memCfg);
+        }
 
         if (client)
             ((TcpDiscoverySpi)cfg.getDiscoverySpi()).setForceServerMode(true);
@@ -95,7 +110,7 @@ public class CacheBalanceTxAndScanQueryRestartTest extends GridCommonAbstractTes
             ccfg.setCacheMode(PARTITIONED);
             ccfg.setAtomicityMode(TRANSACTIONAL);
             ccfg.setBackups(3);
-            ccfg.setRebalanceMode(SYNC);
+            ccfg.setRebalanceMode(ASYNC);
             ccfg.setWriteSynchronizationMode(FULL_SYNC);
 
             caches[i] = ccfg;
@@ -104,6 +119,10 @@ public class CacheBalanceTxAndScanQueryRestartTest extends GridCommonAbstractTes
         cfg.setCacheConfiguration(caches);
 
         return cfg;
+    }
+
+    protected boolean persistence() {
+        return false;
     }
 
     /** {@inheritDoc} */
@@ -125,8 +144,17 @@ public class CacheBalanceTxAndScanQueryRestartTest extends GridCommonAbstractTes
     }
 
     /** {@inheritDoc} */
+    @Override protected void beforeTest() throws Exception {
+        cleanPersistenceDir();
+
+        super.beforeTest();
+    }
+
+    /** {@inheritDoc} */
     @Override protected void afterTest() throws Exception {
         stopAllGrids();
+
+        cleanPersistenceDir();
 
         super.afterTest();
     }
@@ -143,6 +171,8 @@ public class CacheBalanceTxAndScanQueryRestartTest extends GridCommonAbstractTes
 
         for (int i = 0; i < SRV_NODES; i++)
             startGrid(i + 1);
+
+        clientNode.cluster().active(true);
 
         for (int i = 0; i < CACHES; i++) {
             String cacheName = cacheName(i);
@@ -174,7 +204,7 @@ public class CacheBalanceTxAndScanQueryRestartTest extends GridCommonAbstractTes
                 for (int c = 0; c < 20; c++) {
                     checkTotal(lock, clientNode);
 
-                    U.sleep(100);
+                    U.sleep(20);
                 }
 
                 int nodeIdx = rnd.nextInt(SRV_NODES) + 1;
@@ -190,7 +220,7 @@ public class CacheBalanceTxAndScanQueryRestartTest extends GridCommonAbstractTes
                 for (int c = 0; c < 20; c++) {
                     checkTotal(lock, clientNode);
 
-                    U.sleep(100);
+                    U.sleep(20);
                 }
 
                 U.sleep(1000);
@@ -202,7 +232,7 @@ public class CacheBalanceTxAndScanQueryRestartTest extends GridCommonAbstractTes
                 for (int c = 0; c < 20; c++) {
                     checkTotal(lock, clientNode);
 
-                    U.sleep(100);
+                    U.sleep(20);
                 }
 
                 AffinityTopologyVersion waitVer = new AffinityTopologyVersion(topVer, 1);
@@ -264,7 +294,7 @@ public class CacheBalanceTxAndScanQueryRestartTest extends GridCommonAbstractTes
 
                         try (Transaction tx = node.transactions().txStart(PESSIMISTIC, REPEATABLE_READ)) {
                             TestValue val1 = cache1.get(key1);
-                            TestValue val2 = cache1.get(key2);
+                            TestValue val2 = cache2.get(key2);
 
                             long delta = 1;
 
