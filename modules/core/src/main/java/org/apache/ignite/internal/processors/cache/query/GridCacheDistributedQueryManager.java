@@ -619,7 +619,7 @@ public class GridCacheDistributedQueryManager<K, V> extends GridCacheQueryManage
 
         return new GridCloseableIteratorAdapter() {
 
-            GridCloseableIterator locIter00 = locIter;
+            GridCloseableIterator it = locIter;
 
             CacheQueryFuture fut = queryDistributed(bean, nodes0);
             /** */
@@ -640,12 +640,12 @@ public class GridCacheDistributedQueryManager<K, V> extends GridCacheQueryManage
                 if (cur != null)
                     return true;
 
-                if (locIter00 != null && locIter00.hasNextX())
-                    cur = locIter00.nextX();
+                if (it != null && it.hasNextX())
+                    cur = it.nextX();
 
                 if (X.hasCause(fut.error(), ClusterTopologyCheckedException.class)) {
-                    if (locIter00 != null)
-                        locIter00.close();
+                    if (it != null)
+                        it.close();
                     // ** hack */
 
                     Collection<ClusterNode> nodes00 = null;
@@ -672,10 +672,10 @@ public class GridCacheDistributedQueryManager<K, V> extends GridCacheQueryManage
                         }
                     }
 
-                    locIter00 = locIter0;
+                    it = locIter0;
 
-                    if (locIter00 != null && locIter00.hasNextX())
-                        cur = locIter00.nextX();
+                    if (it != null && it.hasNextX())
+                        cur = it.nextX();
 
                     // ** */
                     fut = queryDistributed(bean, nodes00);
@@ -700,8 +700,8 @@ public class GridCacheDistributedQueryManager<K, V> extends GridCacheQueryManage
             @Override protected void onClose() throws IgniteCheckedException {
                 super.onClose();
 
-                if (locIter00 != null)
-                    locIter00.close();
+                if (it != null)
+                    it.close();
 
                 if (fut != null)
                     fut.cancel();

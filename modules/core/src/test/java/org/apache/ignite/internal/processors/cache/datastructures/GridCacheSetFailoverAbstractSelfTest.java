@@ -272,7 +272,7 @@ public abstract class GridCacheSetFailoverAbstractSelfTest extends IgniteCollect
         try {
             ThreadLocalRandom rnd = ThreadLocalRandom.current();
 
-            for (int i = 0; i < 10; i++) {
+            for (int i = 0; i < 1; i++) {
                 int size = set.size();
 
                 assertTrue(size == ITEMS);
@@ -309,7 +309,7 @@ public abstract class GridCacheSetFailoverAbstractSelfTest extends IgniteCollect
 
                 log.info("Create new set.");
 
-                //set = grid(0).set(SET_NAME, config(false));
+                set = grid(0).set(SET_NAME, config(false));
 
                 set.addAll(items);
 
@@ -345,14 +345,6 @@ public abstract class GridCacheSetFailoverAbstractSelfTest extends IgniteCollect
         assertEquals(ITEMS, set.size());
 
         final AtomicBoolean stop = new AtomicBoolean();
-
-        CyclicBarrier srvDown = new CyclicBarrier(2);
-
-        CyclicBarrier srvCanUp = new CyclicBarrier(2);
-
-        CyclicBarrier srvCanDown = new CyclicBarrier(2);
-
-        //IgniteInternalFuture<?> killFut = startNodeKiller(stop, srvCanDown, srvDown, srvCanUp);
 
         try {
             ThreadLocalRandom rnd = ThreadLocalRandom.current();
@@ -394,12 +386,8 @@ public abstract class GridCacheSetFailoverAbstractSelfTest extends IgniteCollect
 
             set.close();
 
-            //stopAllServers(true);
-
             stopAllGrids();
         }
-
-        //killFut.get();
     }
 
     /**
