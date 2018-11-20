@@ -35,6 +35,7 @@ import org.apache.ignite.internal.IgniteInterruptedCheckedException;
 import org.apache.ignite.internal.cluster.ClusterTopologyCheckedException;
 import org.apache.ignite.internal.managers.communication.GridIoPolicy;
 import org.apache.ignite.internal.managers.eventstorage.GridLocalEventListener;
+import org.apache.ignite.internal.processors.affinity.AffinityTopologyVersion;
 import org.apache.ignite.internal.processors.cache.mvcc.MvccSnapshot;
 import org.apache.ignite.internal.processors.query.GridQueryFieldMetadata;
 import org.apache.ignite.internal.util.GridBoundedConcurrentOrderedSet;
@@ -618,12 +619,15 @@ public class GridCacheDistributedQueryManager<K, V> extends GridCacheQueryManage
         final Collection<ClusterNode> nodes0 = nodes;
 
         return new GridCloseableIteratorAdapter() {
-
             GridCloseableIterator it = locIter;
 
             CacheQueryFuture fut = queryDistributed(bean, nodes0);
+
+            AffinityTopologyVersion curAff = cctx.affinity().affinityTopologyVersion();
             /** */
             private Object cur;
+
+            private boolean startRes;
 
             @Override protected Object onNext() throws IgniteCheckedException {
                 if (!onHasNext())
@@ -633,53 +637,82 @@ public class GridCacheDistributedQueryManager<K, V> extends GridCacheQueryManage
 
                 cur = null;
 
+                startRes = true;
+
+                System.err.println("!!!! onNext");
+
+                cctx.affinity().affinityTopologyVersion();
+
                 return e;
             }
 
             @Override protected boolean onHasNext() throws IgniteCheckedException {
-                if (cur != null)
-                    return true;
+                if (cur != null) {
+                    System.err.println("!!!! return true " + cur + " " + fut.error());
 
-                if (it != null && it.hasNextX())
+                    return true;
+                }
+
+                if (it != null && it.hasNextX()) {
                     cur = it.nextX();
 
-                if (X.hasCause(fut.error(), ClusterTopologyCheckedException.class)) {
-                    if (it != null)
-                        it.close();
-                    // ** hack */
-
-                    Collection<ClusterNode> nodes00 = null;
-
-                    GridCloseableIterator locIter0 = null;
-
-                    Collection<ClusterNode> nodes = new ArrayList<>(qry.nodes());
-
-                    for (ClusterNode node : nodes) {
-                        if (node.isLocal()) {
-                            locIter0 = scanQueryLocal(qry, false);
-
-                            Collection<ClusterNode> rmtNodes = new ArrayList<>(nodes.size() - 1);
-
-                            for (ClusterNode n : nodes) {
-                                // Equals by reference can be used here.
-                                if (n != node)
-                                    rmtNodes.add(n);
-                            }
-
-                            nodes00 = rmtNodes;
-
-                            break;
-                        }
-                    }
-
-                    it = locIter0;
-
-                    if (it != null && it.hasNextX())
-                        cur = it.nextX();
-
-                    // ** */
-                    fut = queryDistributed(bean, nodes00);
+                    System.err.println("!!!! cur = it.nextX();");
                 }
+
+                if (X.hasCause(fut.error(), ClusterTopologyCheckedException.class) /*|| !curAff.equals(cctx.affinity().affinityTopologyVersion())*/) {
+
+                    System.err.println("!!!! ClusterTopologyCheckedException");
+
+                    if (startRes) {
+
+                        System.err.println("!!!! startRes");
+
+                        if (it != null)
+                            it.close();
+
+                        cur = null;
+                    }
+                    else {
+
+                        System.err.println("!!!! else");
+
+                        //  hack
+
+                        Collection<ClusterNode> nodes00 = null;
+
+                        GridCloseableIterator locIter0 = null;
+
+                        Collection<ClusterNode> nodes = new ArrayList<>(qry.nodes());
+
+                        for (ClusterNode node : nodes) {
+                            if (node.isLocal()) {
+                                locIter0 = scanQueryLocal(qry, false);
+
+                                Collection<ClusterNode> rmtNodes = new ArrayList<>(nodes.size() - 1);
+
+                                for (ClusterNode n : nodes) {
+                                    // Equals by reference can be used here.
+                                    if (n != node)
+                                        rmtNodes.add(n);
+                                }
+
+                                nodes00 = rmtNodes;
+
+                                break;
+                            }
+                        }
+
+                        it = locIter0;
+
+                        if (it != null && it.hasNextX())
+                            cur = it.nextX();
+
+                        // end hack
+                        fut = queryDistributed(bean, nodes00);
+                    }
+                }
+
+                System.err.println("!!!! return true 2 " + cur);
 
                 return cur != null || (cur = convert(fut.next())) != null;
             }

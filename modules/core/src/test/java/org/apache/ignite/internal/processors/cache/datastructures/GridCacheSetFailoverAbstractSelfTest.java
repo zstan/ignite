@@ -39,6 +39,7 @@ import org.apache.ignite.internal.processors.cache.GridCacheAdapter;
 import org.apache.ignite.internal.processors.cache.GridCacheEntryEx;
 import org.apache.ignite.internal.processors.cache.GridCacheMapEntry;
 import org.apache.ignite.internal.processors.datastructures.SetItemKey;
+import org.apache.ignite.internal.util.typedef.X;
 import org.apache.ignite.internal.util.typedef.internal.U;
 import org.apache.ignite.lang.IgniteUuid;
 import org.apache.ignite.testframework.GridTestUtils;
@@ -46,6 +47,7 @@ import org.apache.ignite.testframework.GridTestUtils;
 import javax.cache.CacheException;
 
 import static org.apache.ignite.cache.CacheMode.PARTITIONED;
+import static org.apache.ignite.cache.CacheMode.REPLICATED;
 
 /**
  * Set failover tests.
@@ -114,7 +116,7 @@ public abstract class GridCacheSetFailoverAbstractSelfTest extends IgniteCollect
         ThreadLocalRandom rnd = ThreadLocalRandom.current();
 
         for (int i = 0; i < 10; i++) {
-            int idx = rnd.nextInt(1, gridCount());
+            int idx = rnd.nextInt(1, gridCount() - 1);
 
             Iterator<Integer> iter = set.iterator();
 
@@ -124,9 +126,21 @@ public abstract class GridCacheSetFailoverAbstractSelfTest extends IgniteCollect
 
             stopGrid(idx);
 
-            assertTrue(iter.hasNext());
+            try {
+                int cnt = 0;
 
-            iter.next();
+                while (iter.hasNext()) {
+                    assertNotNull(iter.next());
+
+                    cnt++;
+                }
+
+                assertTrue("expect: " + ITEMS + " current: " + cnt, cnt == ITEMS - 1);
+            } catch (CacheException e) {
+                System.err.println("exception catched");
+
+                assertTrue(X.getFullStackTrace(e).contains("Failed to execute query on node"));
+            }
 
             startGrid(idx);
         }
@@ -211,41 +225,11 @@ public abstract class GridCacheSetFailoverAbstractSelfTest extends IgniteCollect
         }
     }
 
-    public void test0() {
-        IgniteSet<Integer> set = grid(0).set(SET_NAME, config(false));
-
-        final int ITEMS = 10_000;
-
-        int cnt = 0;
-
-        Collection<Integer> items = new ArrayList<>(ITEMS);
-
-        for (int i = 0; i < ITEMS; i++)
-            items.add(i);
-
-        set.addAll(items);
-
-        Iterator<Integer> iter = set.iterator();
-
-        while (iter.hasNext()) {
-            assertNotNull(iter.next());
-
-            cnt++;
-
-            //System.err.println(iter.next());
-        }
-
-        assertTrue(set.size() == ITEMS);
-
-        assertTrue(cnt == ITEMS);
-    }
-
     /**
      * If iterator already initialized and node failed before iteration start no fail expected.
      *
      * @throws Exception If failed.
      */
-    @SuppressWarnings("WhileLoopReplaceableByForEach")
     public void testNodeFailBeforeIteration() throws Exception {
         IgniteSet<Integer> set = grid(0).set(SET_NAME, config(false));
 
@@ -272,7 +256,7 @@ public abstract class GridCacheSetFailoverAbstractSelfTest extends IgniteCollect
         try {
             ThreadLocalRandom rnd = ThreadLocalRandom.current();
 
-            for (int i = 0; i < 1; i++) {
+            for (int i = 0; i < 2; i++) {
                 int size = set.size();
 
                 assertTrue(size == ITEMS);
@@ -293,6 +277,8 @@ public abstract class GridCacheSetFailoverAbstractSelfTest extends IgniteCollect
 
                 srvCanUp.await();
 
+                U.sleep(500); //IGNITE-10242
+
                 assertTrue("expect: " + ITEMS + " current: " + cnt, cnt == ITEMS);
 
                 int val = rnd.nextInt(ITEMS);
@@ -312,18 +298,14 @@ public abstract class GridCacheSetFailoverAbstractSelfTest extends IgniteCollect
                 set = grid(0).set(SET_NAME, config(false));
 
                 set.addAll(items);
-
-/*                srvCanDown.reset();
-
-                srvDown.reset();
-
-                srvCanUp.reset();*/
             }
         }
         finally {
+            System.err.println("!!!!stop");
+
             stop.set(true);
 
-            //set.close();
+            set.close();
 
             stopAllServers(true);
         }
@@ -349,16 +331,28 @@ public abstract class GridCacheSetFailoverAbstractSelfTest extends IgniteCollect
         try {
             ThreadLocalRandom rnd = ThreadLocalRandom.current();
 
-            for (int i = 0; i < 10; i++) {
+            for (int i = 0; i < 2; i++) {
                 int size = set.size();
 
                 assertTrue(size == ITEMS);
 
+                Iterator<Integer> iter = set.iterator();
+
+                int cnt = 0;
+
                 int idx = rnd.nextInt(1, gridCount());
 
-                log.info("Killing node: " + idx);
-
                 stopGrid(idx);
+
+                while (iter.hasNext()) {
+                    assertNotNull(iter.next());
+
+                    cnt++;
+                }
+
+                startGrid(idx);
+
+                assertTrue("expect: " + ITEMS + " current: " + cnt, cnt == ITEMS);
 
                 int val = rnd.nextInt(ITEMS);
 
@@ -368,9 +362,7 @@ public abstract class GridCacheSetFailoverAbstractSelfTest extends IgniteCollect
 
                 assertFalse("Contains: " + val, set.contains(val));
 
-                startGrid(idx);
-
-                waitForRemoteNodes(grid(0), 3);
+                log.info("Remove set.");
 
                 set.close();
 
@@ -384,9 +376,9 @@ public abstract class GridCacheSetFailoverAbstractSelfTest extends IgniteCollect
         finally {
             stop.set(true);
 
-            set.close();
+            //set.close();
 
-            stopAllGrids();
+            stopAllServers(true);
         }
     }
 
