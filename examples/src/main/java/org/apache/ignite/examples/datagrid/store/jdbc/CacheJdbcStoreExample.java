@@ -17,14 +17,24 @@
 
 package org.apache.ignite.examples.datagrid.store.jdbc;
 
+import java.io.PrintWriter;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.sql.SQLFeatureNotSupportedException;
+import java.util.Objects;
 import java.util.UUID;
+import java.util.logging.Logger;
 import javax.cache.configuration.Factory;
 import javax.cache.configuration.FactoryBuilder;
+import javax.sql.DataSource;
 import org.apache.ignite.Ignite;
 import org.apache.ignite.IgniteCache;
 import org.apache.ignite.IgniteException;
 import org.apache.ignite.Ignition;
 import org.apache.ignite.cache.store.CacheStoreSessionListener;
+import org.apache.ignite.cache.store.jdbc.CacheJdbcBlobStore;
+import org.apache.ignite.cache.store.jdbc.CacheJdbcBlobStoreFactory;
 import org.apache.ignite.cache.store.jdbc.CacheJdbcStoreSessionListener;
 import org.apache.ignite.configuration.CacheConfiguration;
 import org.apache.ignite.examples.ExampleNodeStartup;
@@ -78,25 +88,17 @@ public class CacheJdbcStoreExample {
             System.out.println();
             System.out.println(">>> Cache store example started.");
 
-            CacheConfiguration<Long, Person> cacheCfg = new CacheConfiguration<>(CACHE_NAME);
+            CacheConfiguration cacheCfg = new CacheConfiguration<>(CACHE_NAME);
 
             // Set atomicity as transaction, since we are showing transactions in example.
             cacheCfg.setAtomicityMode(TRANSACTIONAL);
 
             // Configure JDBC store.
-            cacheCfg.setCacheStoreFactory(FactoryBuilder.factoryOf(CacheJdbcPersonStore.class));
-
-            // Configure JDBC session listener.
-            cacheCfg.setCacheStoreSessionListenerFactories(new Factory<CacheStoreSessionListener>() {
-                @Override public CacheStoreSessionListener create() {
-                    CacheJdbcStoreSessionListener lsnr = new CacheJdbcStoreSessionListener();
-
-                    lsnr.setDataSource(JdbcConnectionPool.create("jdbc:h2:tcp://localhost/mem:ExampleDb", "sa", ""));
-
-                    return lsnr;
-                }
-            });
-
+            CacheJdbcBlobStoreFactory blob = new CacheJdbcBlobStoreFactory();
+            blob.setConnectionUrl("jdbc:ydb:grpc://localhost:2136/local");
+            blob.setDataSource(new DataSourceLocal());
+            cacheCfg.setCacheStoreFactory(blob);
+            
             cacheCfg.setReadThrough(true);
             cacheCfg.setWriteThrough(true);
 
@@ -117,6 +119,59 @@ public class CacheJdbcStoreExample {
             }
         }
     }
+
+    private static class DataSourceLocal implements DataSource {
+
+        @Override
+        public Connection getConnection() throws SQLException {
+            Connection conn = DriverManager.getConnection("jdbc:ydb:grpc://localhost:2136/local", null, null);
+            return conn;
+        }
+
+        @Override
+        public Connection getConnection(String username, String password) throws SQLException {
+            Connection conn = DriverManager.getConnection("jdbc:ydb:grpc://localhost:2136/local", null, null);
+            return conn;
+        }
+
+        @Override
+        public <T> T unwrap(Class<T> iface) throws SQLException {
+            return null;
+        }
+
+        @Override
+        public boolean isWrapperFor(Class<?> iface) throws SQLException {
+            return false;
+        }
+
+        @Override
+        public PrintWriter getLogWriter() throws SQLException {
+            return null;
+        }
+
+        @Override
+        public void setLogWriter(PrintWriter out) throws SQLException {
+
+        }
+
+        @Override
+        public void setLoginTimeout(int seconds) throws SQLException {
+
+        }
+
+        @Override
+        public int getLoginTimeout() throws SQLException {
+            return 0;
+        }
+
+        @Override
+        public Logger getParentLogger() throws SQLFeatureNotSupportedException {
+            return null;
+        }
+    }
+
+
+
 
     /**
      * Makes initial cache loading.

@@ -90,8 +90,8 @@ public class CacheJdbcBlobStore<K, V> extends CacheStoreAdapter<K, V> {
      * Default create table query
      * (value is <tt>create table if not exists ENTRIES (akey binary primary key, val binary)</tt>).
      */
-    public static final String DFLT_CREATE_TBL_QRY = "create table if not exists ENTRIES " +
-        "(akey binary primary key, val binary)";
+    public static final String DFLT_CREATE_TBL_QRY = "create table ENTRIES " +
+        "(akey string, val string, PRIMARY KEY(akey))";
 
     /** Default load entry query (value is <tt>select * from ENTRIES where akey=?</tt>). */
     public static final String DFLT_LOAD_QRY = "select * from ENTRIES where akey=?";
@@ -268,7 +268,7 @@ public class CacheJdbcBlobStore<K, V> extends CacheStoreAdapter<K, V> {
             stmt.setObject(1, toBytes(val));
             stmt.setObject(2, toBytes(key));
 
-            if (stmt.executeUpdate() == 0) {
+            if (stmt.executeUpdate() == 1) {
                 stmt.close();
 
                 stmt = conn.prepareStatement(insertQry);
@@ -421,6 +421,7 @@ public class CacheJdbcBlobStore<K, V> extends CacheStoreAdapter<K, V> {
 
                     stmt = conn.createStatement();
 
+                    //stmt.execute("drop table ENTRIES;");
                     stmt.execute(createTblQry);
 
                     conn.commit();
