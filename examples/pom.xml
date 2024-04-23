@@ -68,6 +68,16 @@
             <artifactId>ydb-jdbc-driver-shaded</artifactId>
             <version>2.1.0</version>
         </dependency>
+<!--        <dependency>
+            <groupId>com.yandex.ydb</groupId>
+            <artifactId>ydb-sdk-jdbc</artifactId>
+            <version>1.45.6</version>
+        </dependency>
+        <dependency>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-context</artifactId>
+            <version>1.43.2</version>
+        </dependency>-->
 
         <dependency>
             <groupId>org.springframework</groupId>

@@ -23,7 +23,10 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Collection;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.LongAdder;
@@ -35,11 +38,15 @@ import org.apache.ignite.Ignite;
 import org.apache.ignite.IgniteCheckedException;
 import org.apache.ignite.IgniteException;
 import org.apache.ignite.IgniteLogger;
+import org.apache.ignite.cache.query.SqlFieldsQuery;
 import org.apache.ignite.cache.store.CacheStore;
 import org.apache.ignite.cache.store.CacheStoreAdapter;
 import org.apache.ignite.cache.store.CacheStoreSession;
 import org.apache.ignite.configuration.CacheConfiguration;
+import org.apache.ignite.internal.IgniteEx;
 import org.apache.ignite.internal.IgniteInterruptedCheckedException;
+import org.apache.ignite.internal.processors.query.GridQueryFieldMetadata;
+import org.apache.ignite.internal.processors.query.GridQueryTypeDescriptor;
 import org.apache.ignite.internal.util.tostring.GridToStringExclude;
 import org.apache.ignite.internal.util.typedef.F;
 import org.apache.ignite.internal.util.typedef.internal.S;
@@ -51,6 +58,14 @@ import org.apache.ignite.resources.IgniteInstanceResource;
 import org.apache.ignite.resources.LoggerResource;
 import org.apache.ignite.transactions.Transaction;
 import org.jetbrains.annotations.Nullable;
+import tech.ydb.auth.iam.CloudAuthHelper;
+import tech.ydb.core.grpc.GrpcTransport;
+import tech.ydb.table.SessionRetryContext;
+import tech.ydb.table.TableClient;
+import tech.ydb.table.description.TableDescription;
+import tech.ydb.table.description.TableDescription.Builder;
+import tech.ydb.table.rpc.grpc.GrpcTableRpc;
+import tech.ydb.table.values.PrimitiveType;
 
 /**
  * {@link CacheStore} implementation backed by JDBC. This implementation
@@ -408,6 +423,39 @@ public class CacheJdbcBlobStore<K, V> extends CacheStoreAdapter<K, V> {
 
                     return;
                 }
+
+                IgniteEx ign = (IgniteEx) ignite;
+
+                @Nullable List<GridQueryFieldMetadata> res = ign.context().query()
+                        .getIndexing().resultMetaData("PUBLIC", new SqlFieldsQuery("select * from flex1"));
+
+                Collection<GridQueryTypeDescriptor> types = ign.context().query()
+                        .types("SQL_PUBLIC_FLEX1");
+
+                Set<String> pkeys = null;
+                for (GridQueryTypeDescriptor type : types) {
+                    pkeys = type.primaryKeyFields();
+                }
+
+                GrpcTransport transport = GrpcTransport.forConnectionString("grpc://localhost:2136/local")
+                        //.withAuthProvider(CloudAuthHelper.getAuthProviderFromEnviron())
+                        .build();
+                GrpcTableRpc rpc = GrpcTableRpc.ownTransport(transport);
+                TableClient tableClient = TableClient.newClient(transport).build();
+                String database = transport.getDatabase();
+                SessionRetryContext retryCtx = SessionRetryContext.create(tableClient).build();
+
+                Builder ydbTableBuilder = TableDescription.newBuilder();
+
+                for (GridQueryFieldMetadata meta : res) {
+                    ydbTableBuilder.addNullableColumn(meta.fieldName(), PrimitiveType.Int32);
+                }
+                ydbTableBuilder.setPrimaryKeys(pkeys.toArray(new String[pkeys.size()]));
+
+                TableDescription table = ydbTableBuilder.build();
+
+                retryCtx.supplyStatus(session -> session.createTable(database + "/series1", table))
+                        .join().expectSuccess();
 
                 if (F.isEmpty(createTblQry))
                     throw new IgniteException("Failed to initialize cache store (create table query is not provided).");
