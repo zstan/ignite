@@ -29,7 +29,7 @@ import tech.ydb.table.values.PrimitiveType;
 public class YDBCacheStore <K, V> extends CacheStoreAdapter<K, V> {
     private final String cacheName;
     private SessionRetryContext retryCtx;
-    AtomicBoolean initialized = new AtomicBoolean();
+    private boolean initialized;
     boolean dropBeforeCreate = true;
 
     @IgniteInstanceResource
@@ -50,8 +50,8 @@ public class YDBCacheStore <K, V> extends CacheStoreAdapter<K, V> {
         this.retryCtx = SessionRetryContext.create(tableClient).build();
     }
 
-    private void init() {
-        if (initialized.compareAndSet(false, true)) {
+    private synchronized void init() {
+        if (!initialized) {
             Builder ydbTableBuilder = TableDescription.newBuilder();
 
             Collection<GridQueryTypeDescriptor> types = ((IgniteEx) ignite).context().query().types(cacheName);
@@ -109,6 +109,8 @@ public class YDBCacheStore <K, V> extends CacheStoreAdapter<K, V> {
 
             retryCtx.supplyStatus(session -> session.createTable(database + "/" + cacheName, table))
                     .join().expectSuccess();
+
+            initialized = true;
         }
     }
 
