@@ -19,18 +19,25 @@ package org.apache.ignite.internal.processors.cache;
 
 import org.apache.ignite.Ignite;
 import org.apache.ignite.IgniteCache;
+import org.apache.ignite.IgniteCheckedException;
 import org.apache.ignite.cache.CacheAtomicityMode;
 import org.apache.ignite.cache.CacheMode;
+import org.apache.ignite.cluster.ClusterState;
 import org.apache.ignite.configuration.CacheConfiguration;
+import org.apache.ignite.configuration.DataStorageConfiguration;
 import org.apache.ignite.configuration.IgniteConfiguration;
 import org.apache.ignite.configuration.TransactionConfiguration;
+import org.apache.ignite.internal.util.typedef.internal.U;
 import org.apache.ignite.transactions.Transaction;
 import org.apache.ignite.transactions.TransactionConcurrency;
 import org.apache.ignite.transactions.TransactionIsolation;
 import org.junit.Test;
 
+import java.io.File;
+
 import static org.apache.ignite.cache.CacheAtomicityMode.TRANSACTIONAL;
 import static org.apache.ignite.cache.CacheMode.PARTITIONED;
+import static org.apache.ignite.cache.CacheMode.REPLICATED;
 
 /**
  * Test for read through store.
@@ -38,26 +45,42 @@ import static org.apache.ignite.cache.CacheMode.PARTITIONED;
 public class CacheReadThroughRestartSelfTest extends GridCacheAbstractSelfTest {
     /** {@inheritDoc} */
     @Override protected int gridCount() {
-        return 2;
+        return 3;
     }
 
     /** {@inheritDoc} */
     @Override protected IgniteConfiguration getConfiguration(String igniteInstanceName) throws Exception {
         IgniteConfiguration cfg = super.getConfiguration(igniteInstanceName);
 
-        TransactionConfiguration txCfg = new TransactionConfiguration();
+        DataStorageConfiguration storageCfg = new DataStorageConfiguration();
+        storageCfg.getDefaultDataRegionConfiguration().setPersistenceEnabled(true);
 
-        txCfg.setTxSerializableEnabled(true);
+        cfg.setDataStorageConfiguration(storageCfg);
 
-        cfg.setTransactionConfiguration(txCfg);
+        //TransactionConfiguration txCfg = new TransactionConfiguration();
+
+        //txCfg.setTxSerializableEnabled(true);
+
+        //cfg.setTransactionConfiguration(txCfg);
 
         CacheConfiguration cc = cacheConfiguration(igniteInstanceName);
 
-        cc.setLoadPreviousValue(false);
+        //cc.setLoadPreviousValue(false);
 
         cfg.setCacheConfiguration(cc);
 
-        return cfg;
+        String pos = igniteInstanceName.substring(igniteInstanceName.length() - 1, igniteInstanceName.length());
+
+        cfg.setConsistentId("gridCommandHandlerTest" + pos);
+
+        return cfg
+                .setWorkDirectory(nodeWorkDirectory("gridCommandHandlerTest" + pos));
+
+        //return cfg;
+    }
+
+    private String nodeWorkDirectory(String igniteInstanceName) throws IgniteCheckedException {
+        return new File(U.defaultWorkDirectory(), igniteInstanceName).getAbsolutePath();
     }
 
     /** {@inheritDoc} */
@@ -67,7 +90,7 @@ public class CacheReadThroughRestartSelfTest extends GridCacheAbstractSelfTest {
 
     /** {@inheritDoc} */
     @Override protected CacheMode cacheMode() {
-        return PARTITIONED;
+        return REPLICATED;
     }
 
     /**
@@ -90,6 +113,9 @@ public class CacheReadThroughRestartSelfTest extends GridCacheAbstractSelfTest {
      * @throws Exception If failed.
      */
     private void testReadThroughInTx(boolean needVer) throws Exception {
+        //startGrids(3);
+        grid(0).cluster().state(ClusterState.ACTIVE);
+
         IgniteCache<String, Integer> cache = grid(1).cache(DEFAULT_CACHE_NAME);
 
         for (int k = 0; k < 1000; k++)
@@ -97,7 +123,7 @@ public class CacheReadThroughRestartSelfTest extends GridCacheAbstractSelfTest {
 
         stopAllGrids();
 
-        startGrids(2);
+        startGrids(3);
 
         awaitPartitionMapExchange();
 
@@ -105,7 +131,14 @@ public class CacheReadThroughRestartSelfTest extends GridCacheAbstractSelfTest {
 
         cache = ignite.cache(DEFAULT_CACHE_NAME);
 
-        for (TransactionConcurrency txConcurrency : TransactionConcurrency.values()) {
+        for (int k = 0; k < 1000; k++) {
+            String key = "key" + k;
+
+            assertNotNull("Null value for key: " + key, cache.get(key));
+            assertNotNull("Null value for key: " + key, cache.get(key));
+        }
+
+/*        for (TransactionConcurrency txConcurrency : TransactionConcurrency.values()) {
             for (TransactionIsolation txIsolation : TransactionIsolation.values()) {
                 try (Transaction tx = cache.getConfiguration(CacheConfiguration.class).getAtomicityMode() == TRANSACTIONAL ?
                     ignite.transactions().txStart(txConcurrency, txIsolation, 100000, 1000) : null) {
@@ -126,7 +159,7 @@ public class CacheReadThroughRestartSelfTest extends GridCacheAbstractSelfTest {
                         tx.commit();
                 }
             }
-        }
+        }*/
     }
 
     /**

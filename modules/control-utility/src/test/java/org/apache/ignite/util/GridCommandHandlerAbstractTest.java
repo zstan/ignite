@@ -269,7 +269,7 @@ public abstract class GridCommandHandlerAbstractTest extends GridCommandHandlerF
             .setWalCompactionEnabled(walCompaction)
             .setCheckpointFrequency(checkpointFreq)
             .setDefaultDataRegionConfiguration(
-                new DataRegionConfiguration().setMaxSize(50L * 1024 * 1024).setPersistenceEnabled(persistent)
+                new DataRegionConfiguration().setMaxSize(50L * 1024 * 1024).setPersistenceEnabled(persistenceEnable())
             );
 
         if (dataRegionConfiguration != null)

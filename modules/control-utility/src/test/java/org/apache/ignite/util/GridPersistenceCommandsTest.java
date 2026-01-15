@@ -372,7 +372,7 @@ public class GridPersistenceCommandsTest extends GridCommandHandlerClusterPerMet
     }
 
     /** */
-    private CacheConfiguration cacheConfiguration(String cacheName) {
+    @Override protected CacheConfiguration cacheConfiguration(String cacheName) {
         CacheConfiguration ccfg = new CacheConfiguration(cacheName)
             .setAtomicityMode(TRANSACTIONAL)
             .setAffinity(new RendezvousAffinityFunction(false, 32))

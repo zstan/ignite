@@ -168,7 +168,7 @@ public class BinariesFactoryImpl implements BinariesFactory {
 
         predefinedTypes.put(BinaryEnumObjectImpl.class, 0);
 
-        return predefinedTypes;
+        return Map.of(BinaryEnumObjectImpl.class, 0);
     }
 
     /** {@inheritDoc} */

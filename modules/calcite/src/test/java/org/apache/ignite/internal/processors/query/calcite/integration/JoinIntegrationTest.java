@@ -65,6 +65,23 @@ public class JoinIntegrationTest extends AbstractBasicIntegrationTransactionalTe
         // NO-OP
     }
 
+    @Test
+    public void testNonColocatedNaturalJoin() {
+        executeSql("CREATE TABLE tbl1 (a INTEGER, b INTEGER,  PRIMARY KEY(b));");
+        executeSql("CREATE TABLE tbl2 (a INTEGER, c INTEGER,  PRIMARY KEY(c));");
+        executeSql("CREATE TABLE tbl3 (a INTEGER, b INTEGER, c INTEGER, PRIMARY KEY(a))");
+
+        sql("INSERT INTO tbl1 VALUES (1, 2)");
+        sql("INSERT INTO tbl2 VALUES (1, 3), (2, 4)");
+        sql("INSERT INTO tbl3 VALUES (1, 2, 3)");
+
+        //gatherStatistics();
+
+        assertQuery("SELECT * FROM tbl1 NATURAL JOIN tbl2 NATURAL JOIN tbl3")
+                .returns(1, 2, 3)
+                .check();
+    }
+
     /** */
     @Test
     public void testIsNotDistinctWithEquiConditionFrom() {

@@ -2178,6 +2178,7 @@ public abstract class GridAbstractTest extends JUnitAssertAware {
 
         cfg.setAtomicityMode(TRANSACTIONAL).setNearConfiguration(new NearCacheConfiguration<>());
         cfg.setWriteSynchronizationMode(FULL_SYNC);
+        cfg.setReadFromBackup(true);
         cfg.setEvictionPolicy(null);
 
         return cfg;

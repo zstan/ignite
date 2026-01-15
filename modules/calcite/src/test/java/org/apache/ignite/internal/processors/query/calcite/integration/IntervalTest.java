@@ -22,6 +22,8 @@ import java.sql.Time;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Period;
+import java.util.List;
+
 import org.apache.ignite.internal.processors.query.IgniteSQLException;
 import org.junit.Test;
 
@@ -51,6 +53,12 @@ public class IntervalTest extends AbstractBasicIntegrationTest {
         assertEquals(Duration.ofSeconds(63), eval("INTERVAL '1:3' MINUTE TO SECOND"));
         assertEquals(Duration.ofSeconds(3723), eval("INTERVAL '1:2:3' HOUR TO SECOND"));
         assertEquals(Duration.ofMillis(3723456), eval("INTERVAL '0 1:2:3.456' DAY TO SECOND"));
+    }
+
+    @Test
+    public void test0() {
+        List<List<?>> res = sql("select log10(0.1)");
+        System.err.println();
     }
 
     /**

@@ -51,6 +51,7 @@ import org.apache.ignite.internal.management.IgniteCommandRegistry;
 import org.apache.ignite.internal.management.api.Command;
 import org.apache.ignite.internal.management.api.CommandWarningException;
 import org.apache.ignite.internal.management.api.CommandsRegistry;
+import org.apache.ignite.internal.processors.cache.GridCacheAbstractSelfTest;
 import org.apache.ignite.internal.util.typedef.X;
 import org.apache.ignite.internal.util.typedef.internal.U;
 import org.apache.ignite.testframework.junits.common.GridCommonAbstractTest;
@@ -74,7 +75,7 @@ import static org.apache.ignite.internal.processors.odbc.ClientListenerProcessor
 
 /** Class to check command execution via all available handlers. */
 @RunWith(Parameterized.class)
-public class GridCommandHandlerFactoryAbstractTest extends GridCommonAbstractTest {
+public class GridCommandHandlerFactoryAbstractTest extends GridCacheAbstractSelfTest {
     /** @see JmxCommandHandler */
     public static final String JMX_CMD_HND = "jmx";
 
@@ -126,6 +127,11 @@ public class GridCommandHandlerFactoryAbstractTest extends GridCommonAbstractTes
     /** */
     protected boolean cliCommandHandler() {
         return commandHandler.equals(CLI_CMD_HND);
+    }
+
+    @Override
+    protected int gridCount() {
+        return 3;
     }
 
     /** */

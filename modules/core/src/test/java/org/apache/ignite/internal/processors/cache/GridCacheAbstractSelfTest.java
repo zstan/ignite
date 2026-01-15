@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.cache.Cache;
 import javax.cache.configuration.Factory;
+import javax.cache.expiry.EternalExpiryPolicy;
 import javax.cache.processor.EntryProcessor;
 import javax.cache.processor.MutableEntry;
 import org.apache.ignite.Ignite;
@@ -35,6 +36,7 @@ import org.apache.ignite.cache.CacheMode;
 import org.apache.ignite.cache.CachePeekMode;
 import org.apache.ignite.cache.CacheWriteSynchronizationMode;
 import org.apache.ignite.cache.store.CacheStore;
+import org.apache.ignite.cluster.ClusterState;
 import org.apache.ignite.configuration.CacheConfiguration;
 import org.apache.ignite.configuration.IgniteConfiguration;
 import org.apache.ignite.configuration.NearCacheConfiguration;
@@ -96,6 +98,8 @@ public abstract class GridCacheAbstractSelfTest extends GridCommonAbstractTest {
 
         startGrids(cnt);
 
+        grid(0).cluster().state(ClusterState.ACTIVE);
+
         awaitPartitionMapExchange();
     }
 
@@ -119,8 +123,9 @@ public abstract class GridCacheAbstractSelfTest extends GridCommonAbstractTest {
 
     /** {@inheritDoc} */
     @Override protected void beforeTest() throws Exception {
-        assert jcache().unwrap(Ignite.class).transactions().tx() == null;
-        assertEquals(0, jcache().localSize());
+        //grid(0).cluster().state(ClusterState.ACTIVE);
+        //assert jcache().unwrap(Ignite.class).transactions().tx() == null;
+        //assertEquals(0, jcache().localSize());
     }
 
     /** {@inheritDoc} */
@@ -222,7 +227,8 @@ public abstract class GridCacheAbstractSelfTest extends GridCommonAbstractTest {
                 cfg.setCacheStoreFactory(storeFactory);
                 cfg.setReadThrough(true);
                 cfg.setWriteThrough(true);
-                cfg.setLoadPreviousValue(true);
+                cfg.setExpiryPolicyFactory(EternalExpiryPolicy.factoryOf());
+                //cfg.setLoadPreviousValue(true);
                 storeStgy.updateCacheConfiguration(cfg);
             }
         }

@@ -34,7 +34,7 @@ import static java.util.stream.Stream.of;
  * */
 public abstract class GridCommandHandlerClusterByClassAbstractTest extends GridCommandHandlerAbstractTest {
     /** Number of server nodes. */
-    protected static final int SERVER_NODE_CNT = 2;
+    protected static final int SERVER_NODE_CNT = 3;
 
     /** Coordinator. */
     protected static IgniteEx crd;
@@ -46,13 +46,13 @@ public abstract class GridCommandHandlerClusterByClassAbstractTest extends GridC
     @Override protected void beforeTestsStarted() throws Exception {
         super.beforeTestsStarted();
 
-        crd = startGrids(SERVER_NODE_CNT);
+        //crd = startGrids(SERVER_NODE_CNT);
 
-        crd.cluster().baselineAutoAdjustEnabled(false);
+        //crd.cluster().baselineAutoAdjustEnabled(false);
 
         client = startGrid(CLIENT_NODE_NAME_PREFIX);
 
-        crd.cluster().state(ClusterState.ACTIVE);
+        client.cluster().state(ClusterState.ACTIVE);
     }
 
     /** {@inheritDoc} */
@@ -61,7 +61,7 @@ public abstract class GridCommandHandlerClusterByClassAbstractTest extends GridC
 
         stopAllGrids();
 
-        cleanPersistenceDir();
+        //cleanPersistenceDir();
     }
 
     /** {@inheritDoc} */

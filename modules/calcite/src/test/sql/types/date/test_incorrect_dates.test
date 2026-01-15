@@ -52,3 +52,17 @@ INSERT INTO dates VALUES ('-100000000-01-01')
 statement error
 INSERT INTO dates VALUES ('1000000000-01-01')
 
+statement error
+INSERT INTO dates VALUES (date '10000-01-01')
+
+statement error
+INSERT INTO dates VALUES ('10000-00-01'::DATE)
+
+# TODO https://issues.apache.org/jira/browse/IGNITE-25010 This should be parser error
+statement error
+INSERT INTO dates VALUES (CAST('9999-99-99' AS DATE FORMAT 'YYYY-MM-DD'))
+
+# The value is less than the minimum allowed
+statement error
+INSERT INTO dates VALUES (DATE '0001-01-01' - INTERVAL 1 DAYS)
+

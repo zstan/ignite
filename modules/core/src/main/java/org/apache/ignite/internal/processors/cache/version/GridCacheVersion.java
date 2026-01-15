@@ -245,6 +245,7 @@ public class GridCacheVersion implements Message, Externalizable, CacheEntryVers
         res = 31 * res + (int)(order ^ (order >>> 32));
 
         return res;
+        //return 1;
     }
 
     /** {@inheritDoc} */
