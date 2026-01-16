@@ -23,9 +23,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 import javax.cache.Cache;
 import javax.cache.configuration.Factory;
 import javax.cache.configuration.FactoryBuilder;
+import javax.cache.integration.CacheLoaderException;
+
 import org.apache.ignite.cache.store.CacheStore;
 import org.apache.ignite.cache.store.CacheStoreAdapter;
 import org.apache.ignite.configuration.CacheConfiguration;
+import org.apache.ignite.internal.IgniteInterruptedCheckedException;
+import org.apache.ignite.internal.util.typedef.internal.U;
 import org.apache.ignite.lang.IgniteBiInClosure;
 
 /**
@@ -126,6 +130,7 @@ public class MapCacheStoreStrategy implements TestCacheStoreStrategy {
 
         /** {@inheritDoc} */
         @Override public Object load(Object key) {
+            //System.err.println("!!!MapCacheStore load: " + key + " " + hashCode());
             reads.incrementAndGet();
             return map.get(key);
         }
@@ -134,6 +139,10 @@ public class MapCacheStoreStrategy implements TestCacheStoreStrategy {
         @Override public void write(Cache.Entry<?, ?> e) {
             writes.incrementAndGet();
             map.put(e.getKey(), e.getValue());
+
+            if (writes.get() % 1000 == 0) {
+                System.err.println("!!!!MapCacheStore size: " + map.size());
+            }
         }
 
         /** {@inheritDoc} */

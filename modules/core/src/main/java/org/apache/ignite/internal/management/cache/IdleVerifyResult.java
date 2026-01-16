@@ -407,6 +407,7 @@ public class IdleVerifyResult extends IgniteDataTransferObject {
                 Integer partHash = null;
                 Integer partVerHash = null;
                 Object updateCntr = null;
+                long size = 0;
 
                 for (PartitionHashRecord record : e.getValue()) {
                     if (record.partitionState() == PartitionHashRecord.PartitionState.MOVING) {
@@ -426,12 +427,17 @@ public class IdleVerifyResult extends IgniteDataTransferObject {
                         partVerHash = record.partitionVersionsHash();
 
                         updateCntr = record.updateCounter();
+                        size = record.size();
                     }
                     else {
+                        if (size != record.size()) {
+                            cntrConflicts.putIfAbsent(e.getKey(), e.getValue());
+                        }
+
                         if (!Objects.equals(record.updateCounter(), updateCntr))
                             cntrConflicts.putIfAbsent(e.getKey(), e.getValue());
 
-                        if (record.partitionHash() != partHash || record.partitionVersionsHash() != partVerHash)
+                        if (record.partitionHash() != partHash /*|| record.partitionVersionsHash() != partVerHash*/)
                             hashConflicts.putIfAbsent(e.getKey(), e.getValue());
                     }
                 }
