@@ -18,6 +18,7 @@
 package org.apache.ignite.util;
 
 import java.io.File;
+
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -41,6 +42,7 @@ import org.apache.ignite.cache.CacheAtomicityMode;
 import org.apache.ignite.cache.CacheMode;
 import org.apache.ignite.cache.query.SqlFieldsQuery;
 import org.apache.ignite.cache.store.CacheStore;
+import org.apache.ignite.cluster.ClusterState;
 import org.apache.ignite.configuration.*;
 import org.apache.ignite.internal.IgniteEx;
 import org.apache.ignite.internal.IgniteInternalFuture;
@@ -92,7 +94,7 @@ public class IdleVerifyDumpTest extends GridCommandHandlerClusterByClassAbstract
 
             cc1.setAtomicityMode(TRANSACTIONAL);
             cc1.setCacheMode(REPLICATED);
-            //cc1.setWriteSynchronizationMode(FULL_SYNC);
+            cc1.setWriteSynchronizationMode(FULL_SYNC);
             cc1.setStoreKeepBinary(true);
 
             if (store != null) {
@@ -166,6 +168,7 @@ public class IdleVerifyDumpTest extends GridCommandHandlerClusterByClassAbstract
 
             stopAllGrids();
             startGrids(3);
+            grid(0).cluster().state(ClusterState.ACTIVE);
             client = startClientGrid(CLIENT_NODE_NAME_PREFIX);
 
             cache = client.getOrCreateCache(DEFAULT_CACHE_NAME);
