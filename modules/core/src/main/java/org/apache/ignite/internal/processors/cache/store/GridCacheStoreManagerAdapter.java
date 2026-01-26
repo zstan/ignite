@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import javax.cache.Cache;
 import javax.cache.integration.CacheLoaderException;
 import javax.cache.integration.CacheWriterException;
@@ -913,11 +914,16 @@ public abstract class GridCacheStoreManagerAdapter extends GridCacheManagerAdapt
                 for (CacheStoreSessionListener lsnr : sesLsnrs)
                     lsnr.onSessionStart(locSes);
             }
+
+/*            if (count.incrementAndGet() % 3000 == 0)
+                throw new IgniteCheckedException("FAKE !!!: ");*/
         }
         catch (Exception e) {
-            throw new IgniteCheckedException("Failed to start store session: " + e, e);
+            throw new IgniteCheckedException("Failed to start store session: " + e + " " + cctx.discovery().localNode(), e);
         }
     }
+
+    AtomicInteger count = new AtomicInteger();
 
     /**
      * Clears session holder.

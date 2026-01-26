@@ -914,7 +914,8 @@ public abstract class GridCacheMapEntry extends GridMetadataAwareAdapter impleme
                 long ttl = ttlExtras();
 
                 // Generate new version.
-                GridCacheVersion nextVer = cctx.versions().nextForLoad(ver);
+                //GridCacheVersion nextVer = cctx.versions().nextForLoad(ver);
+                GridCacheVersion nextVer = new GridCacheVersion(1, 1, 1, 1);
 
                 // If entry was loaded during read step.
                 if (wasNew && !isNew())

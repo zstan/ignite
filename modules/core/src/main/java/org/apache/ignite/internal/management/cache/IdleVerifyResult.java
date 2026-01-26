@@ -90,13 +90,13 @@ public class IdleVerifyResult extends IgniteDataTransferObject {
      * @see #builder()
      */
     private IdleVerifyResult(
-        Map<PartitionKey, List<PartitionHashRecord>> cntrConflicts,
-        Map<PartitionKey, List<PartitionHashRecord>> hashConflicts,
-        Map<PartitionKey, List<PartitionHashRecord>> movingPartitions,
-        Map<PartitionKey, List<PartitionHashRecord>> lostPartitions,
-        @Nullable List<List<TransactionsHashRecord>> txHashConflicts,
-        @Nullable Map<ClusterNode, Collection<GridCacheVersion>> partiallyCommittedTxs,
-        Map<ClusterNode, Exception> exceptions
+            Map<PartitionKey, List<PartitionHashRecord>> cntrConflicts,
+            Map<PartitionKey, List<PartitionHashRecord>> hashConflicts,
+            Map<PartitionKey, List<PartitionHashRecord>> movingPartitions,
+            Map<PartitionKey, List<PartitionHashRecord>> lostPartitions,
+            @Nullable List<List<TransactionsHashRecord>> txHashConflicts,
+            @Nullable Map<ClusterNode, Collection<GridCacheVersion>> partiallyCommittedTxs,
+            Map<ClusterNode, Exception> exceptions
     ) {
         this.cntrConflicts = cntrConflicts;
         this.hashConflicts = hashConflicts;
@@ -163,7 +163,7 @@ public class IdleVerifyResult extends IgniteDataTransferObject {
      */
     public boolean hasConflicts() {
         return !F.isEmpty(hashConflicts()) || !F.isEmpty(counterConflicts())
-            || !F.isEmpty(txHashConflicts) || !F.isEmpty(partiallyCommittedTxs);
+                || !F.isEmpty(txHashConflicts) || !F.isEmpty(partiallyCommittedTxs);
     }
 
     /**
@@ -228,9 +228,9 @@ public class IdleVerifyResult extends IgniteDataTransferObject {
      * @param partitionState Partition state.
      */
     private void printSkippedPartitions(
-        Consumer<String> printer,
-        Map<PartitionKey, List<PartitionHashRecord>> map,
-        String partitionState
+            Consumer<String> printer,
+            Map<PartitionKey, List<PartitionHashRecord>> map,
+            String partitionState
     ) {
         if (!F.isEmpty(map)) {
             printer.accept("Verification was skipped for " + map.size() + " " + partitionState + " partitions:\n");
@@ -251,10 +251,10 @@ public class IdleVerifyResult extends IgniteDataTransferObject {
         int hashConflictsSize = hashConflicts().size();
 
         printer.accept("The check procedure has failed, conflict partitions has been found: [" +
-            "counterConflicts=" + cntrConflictsSize + ", hashConflicts=" + hashConflictsSize
-            + (txHashConflicts == null ? "" : ", txHashConflicts=" + txHashConflicts.size())
-            + (partiallyCommittedTxs == null ? "" : ", partiallyCommittedSize=" + partiallyCommittedTxs.size())
-            + "]" + nl());
+                "counterConflicts=" + cntrConflictsSize + ", hashConflicts=" + hashConflictsSize
+                + (txHashConflicts == null ? "" : ", txHashConflicts=" + txHashConflicts.size())
+                + (partiallyCommittedTxs == null ? "" : ", partiallyCommittedSize=" + partiallyCommittedTxs.size())
+                + "]" + nl());
 
         Set<PartitionKey> allConflicts = new HashSet<>();
 
@@ -305,18 +305,18 @@ public class IdleVerifyResult extends IgniteDataTransferObject {
         printer.accept("Total:" + nl());
 
         Map<String, TreeSet<Integer>> conflictsSummary = allConflicts.stream()
-            .collect(Collectors.groupingBy(
-                PartitionKey::groupName,
-                Collectors.mapping(
-                    PartitionKey::partitionId,
-                    Collectors.toCollection(TreeSet::new))));
+                .collect(Collectors.groupingBy(
+                        PartitionKey::groupName,
+                        Collectors.mapping(
+                                PartitionKey::partitionId,
+                                Collectors.toCollection(TreeSet::new))));
 
         for (Map.Entry<String, TreeSet<Integer>> grpConflicts : conflictsSummary.entrySet()) {
             printer.accept(String.format("%s (%d)%s", grpConflicts.getKey(), grpConflicts.getValue().size(), nl()));
 
             String partsStr = grpConflicts.getValue().stream()
-                .map(String::valueOf)
-                .collect(Collectors.joining(","));
+                    .map(String::valueOf)
+                    .collect(Collectors.joining(","));
 
             printer.accept(partsStr + nl());
 
@@ -335,21 +335,21 @@ public class IdleVerifyResult extends IgniteDataTransferObject {
         IdleVerifyResult v = (IdleVerifyResult)o;
 
         return Objects.equals(cntrConflicts, v.cntrConflicts) && Objects.equals(hashConflicts, v.hashConflicts) &&
-            Objects.equals(movingPartitions, v.movingPartitions) && Objects.equals(lostPartitions, v.lostPartitions) &&
-            Objects.equals(exceptions, v.exceptions) && Objects.equals(txHashConflicts, v.txHashConflicts) &&
-            Objects.equals(partiallyCommittedTxs, v.partiallyCommittedTxs);
+                Objects.equals(movingPartitions, v.movingPartitions) && Objects.equals(lostPartitions, v.lostPartitions) &&
+                Objects.equals(exceptions, v.exceptions) && Objects.equals(txHashConflicts, v.txHashConflicts) &&
+                Objects.equals(partiallyCommittedTxs, v.partiallyCommittedTxs);
     }
 
     /** {@inheritDoc} */
     @Override public int hashCode() {
         return Objects.hash(
-            cntrConflicts,
-            hashConflicts,
-            movingPartitions,
-            lostPartitions,
-            exceptions,
-            txHashConflicts,
-            partiallyCommittedTxs);
+                cntrConflicts,
+                hashConflicts,
+                movingPartitions,
+                lostPartitions,
+                exceptions,
+                txHashConflicts,
+                partiallyCommittedTxs);
     }
 
     /** {@inheritDoc} */
@@ -400,12 +400,13 @@ public class IdleVerifyResult extends IgniteDataTransferObject {
 
             if (F.isEmpty(partHashes)) {
                 return new IdleVerifyResult(cntrConflicts, hashConflicts, movingPartitions, lostPartitions, txHashConflicts,
-                    partiallyCommittedTxs, exceptions);
+                        partiallyCommittedTxs, exceptions);
             }
 
             for (Map.Entry<PartitionKey, List<PartitionHashRecord>> e : partHashes.entrySet()) {
                 Integer partHash = null;
                 Integer partVerHash = null;
+                Long size = null;
                 Object updateCntr = null;
 
                 for (PartitionHashRecord record : e.getValue()) {
@@ -424,11 +425,12 @@ public class IdleVerifyResult extends IgniteDataTransferObject {
                     if (partHash == null) {
                         partHash = record.partitionHash();
                         partVerHash = record.partitionVersionsHash();
+                        size = record.size();
 
                         updateCntr = record.updateCounter();
                     }
                     else {
-                        if (!Objects.equals(record.updateCounter(), updateCntr))
+                        if (!Objects.equals(record.updateCounter(), updateCntr) || !Objects.equals(record.size(), size))
                             cntrConflicts.putIfAbsent(e.getKey(), e.getValue());
 
                         if (record.partitionHash() != partHash || record.partitionVersionsHash() != partVerHash)
@@ -438,7 +440,7 @@ public class IdleVerifyResult extends IgniteDataTransferObject {
             }
 
             return new IdleVerifyResult(cntrConflicts, hashConflicts, movingPartitions, lostPartitions, txHashConflicts,
-                partiallyCommittedTxs, exceptions);
+                    partiallyCommittedTxs, exceptions);
         }
 
         /** Stores an exception if none is set for certain node. */

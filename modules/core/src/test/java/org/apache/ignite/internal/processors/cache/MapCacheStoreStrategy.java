@@ -127,12 +127,20 @@ public class MapCacheStoreStrategy implements TestCacheStoreStrategy {
         /** {@inheritDoc} */
         @Override public Object load(Object key) {
             reads.incrementAndGet();
+
+            System.err.println("!!!! LOAD key=" + key);
+
             return map.get(key);
         }
 
         /** {@inheritDoc} */
         @Override public void write(Cache.Entry<?, ?> e) {
             writes.incrementAndGet();
+
+            if (writes.get() % 1000 == 0) {
+                System.err.println("!!!WRITE : " + writes.get());
+            }
+
             map.put(e.getKey(), e.getValue());
         }
 
