@@ -20,6 +20,7 @@ package org.apache.ignite.internal.jdbc.thin;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.IOException;
+import java.net.BindException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.sql.SQLException;
@@ -31,11 +32,15 @@ import java.util.Objects;
 import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import javax.cache.configuration.Factory;
 import org.apache.ignite.IgniteCheckedException;
 import org.apache.ignite.cache.query.QueryCancelledException;
+import org.apache.ignite.internal.IgniteInterruptedCheckedException;
 import org.apache.ignite.internal.MarshallerContextImpl;
 import org.apache.ignite.internal.ThinProtocolFeature;
 import org.apache.ignite.internal.binary.BinaryContext;
@@ -183,6 +188,8 @@ public class JdbcThinTcpIo {
      * @throws SQLException On connection error or reject.
      * @throws IOException On IO error in handshake.
      */
+    static AtomicInteger cnt = new AtomicInteger();
+
     public JdbcThinTcpIo(ConnectionProperties connProps, InetSocketAddress sockAddr, BinaryContext ctx, int timeout)
         throws SQLException, IOException {
         this.connProps = connProps;
@@ -199,6 +206,10 @@ public class JdbcThinTcpIo {
 
                 try {
                     sock.connect(sockAddr, timeout);
+                    if (ThreadLocalRandom.current().nextInt(100) % 20 == 0)
+/*                    cnt.incrementAndGet();
+                    if (cnt.get() % 2 == 0)*/
+                        throw new BindException("FAKE");
                 }
                 catch (IOException e) {
                     throw new SQLException("Failed to connect to server [host=" + sockAddr.getHostName() +

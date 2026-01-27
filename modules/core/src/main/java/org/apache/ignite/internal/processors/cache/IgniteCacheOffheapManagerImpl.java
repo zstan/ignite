@@ -1673,8 +1673,11 @@ public class IgniteCacheOffheapManagerImpl implements IgniteCacheOffheapManager 
          */
         private void finishUpdate(GridCacheContext cctx, CacheDataRow newRow, @Nullable CacheDataRow oldRow, boolean oldRowExpired)
             throws IgniteCheckedException {
-            if (oldRow == null && !oldRowExpired)
+            //System.err.println("!!!salvage2");
+            if (oldRow == null && !oldRowExpired) {
+                //System.err.println("!!!salvage3 " + oldRow);
                 incrementSize(cctx.cacheId());
+            }
 
             GridCacheQueryManager qryMgr = cctx.queries();
 

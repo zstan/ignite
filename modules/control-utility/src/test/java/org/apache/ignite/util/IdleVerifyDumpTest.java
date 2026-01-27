@@ -91,6 +91,42 @@ public class IdleVerifyDumpTest extends GridCommandHandlerClusterByClassAbstract
     }
 
     @Test
+    public void test1() throws Exception {
+        IgniteCache<Object, Object> cache = client.getOrCreateCache(DEFAULT_CACHE_NAME);
+
+        cache.query(new SqlFieldsQuery("CREATE TABLE IF NOT EXISTS T1 (ID INT PRIMARY KEY, VAL varbinary) WITH " +
+                "\"CACHE_NAME=default2\""));
+
+        IgniteCache<Object, Object> cache1 = client.cache("default2");
+
+        cache1.clear();
+        storeStgy.resetStore();
+
+        cache = client.getOrCreateCache(DEFAULT_CACHE_NAME);
+        cache1 = client.cache("default2");
+        //cache1.loadCache(null, 100);
+        System.err.println("cache size: " + cache1.size());
+        final AtomicInteger counter = new AtomicInteger();
+
+        cache.query(new SqlFieldsQuery("CREATE TABLE IF NOT EXISTS T1 (ID INT PRIMARY KEY, VAL varbinary) WITH " +
+                "\"CACHE_NAME=default2\""));
+
+        Connection conn0 = DriverManager.getConnection("jdbc:ignite:thin://127.0.0.1:10800");
+        PreparedStatement stmtInsert = conn0.prepareStatement("INSERT INTO T1 VALUES (?, ?)");
+
+        int k = counter.incrementAndGet();
+        try {
+            stmtInsert.setInt(1, k);
+            stmtInsert.setBytes(2, new byte[2048]);
+            stmtInsert.executeUpdate();
+        } catch (java.sql.SQLException ex) {
+            // no op.
+        }
+
+        checkDump(0);
+    }
+
+    @Test
     public void test0() throws Exception {
         String URL[] = {"jdbc:ignite:thin://127.0.0.1:10800", "jdbc:ignite:thin://127.0.0.1:10801", "jdbc:ignite:thin://127.0.0.1:10802"};
 

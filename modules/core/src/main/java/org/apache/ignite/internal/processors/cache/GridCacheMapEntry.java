@@ -914,8 +914,7 @@ public abstract class GridCacheMapEntry extends GridMetadataAwareAdapter impleme
                 long ttl = ttlExtras();
 
                 // Generate new version.
-                //GridCacheVersion nextVer = cctx.versions().nextForLoad(ver);
-                GridCacheVersion nextVer = new GridCacheVersion(1, 1, 1, 1);
+                GridCacheVersion nextVer = cctx.versions().nextForLoad(ver);
 
                 // If entry was loaded during read step.
                 if (wasNew && !isNew())
@@ -931,12 +930,14 @@ public abstract class GridCacheMapEntry extends GridMetadataAwareAdapter impleme
 
                     // Update indexes.
                     if (ret != null) {
+                        System.err.println("!!!salvage1a p: " + key);
                         storeValue(ret, expTime, nextVer);
 
                         if (cctx.deferredDelete() && !isInternal() && !detached() && deletedUnlocked())
                             deletedUnlocked(false);
                     }
                     else {
+                        System.err.println("!!!salvage1r p: " + key);
                         removeValue();
 
                         if (cctx.deferredDelete() && !isInternal() && !detached() && !deletedUnlocked())
@@ -3445,6 +3446,7 @@ public abstract class GridCacheMapEntry extends GridMetadataAwareAdapter impleme
         UpdateClosure closure = new UpdateClosure(this, val, ver, expireTime, predicate, row);
 
         cctx.offheap().invoke(cctx, key, localPartition(), closure);
+        System.err.println("!!!prt: " + key + "|");
 
         return closure.treeOp != IgniteTree.OperationType.NOOP;
     }

@@ -1957,8 +1957,11 @@ public abstract class IgniteTxAdapter extends GridMetadataAwareAdapter implement
                         assert part != null;
 
                         try {
-                            if (part.state() != GridDhtPartitionState.RENTING)
+                            if (part.state() != GridDhtPartitionState.RENTING) {
                                 part.dataStore().updateSize(cacheId, delta);
+                                System.err.println("!!!! RENTING");
+                                System.err.println("RENTING " + cacheId);
+                            }
                             else
                                 invalid = true;
                         }

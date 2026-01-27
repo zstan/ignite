@@ -609,6 +609,8 @@ public class IgniteTxManager extends GridCacheSharedManagerAdapter {
 
             tx.salvageTx();
 
+            System.err.println("!!!! salvageTx " + tx.xidVersion());
+
             if (log.isInfoEnabled())
                 log.info("Invalidated transaction because originating node left grid: " + CU.txString(tx));
         }

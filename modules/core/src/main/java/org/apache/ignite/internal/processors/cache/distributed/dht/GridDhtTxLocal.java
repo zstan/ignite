@@ -291,6 +291,8 @@ public class GridDhtTxLocal extends GridDhtTxLocalAdapter implements GridCacheMa
 
         state(PREPARED);
 
+        System.err.println("!!!! salvageTx dhtLocal");
+
         if (state() == PREPARING) {
             if (log.isDebugEnabled())
                 log.debug("Ignoring transaction in PREPARING state as it is currently handled " +
