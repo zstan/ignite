@@ -8,7 +8,7 @@ updates:
   - package-ecosystem: "maven"
     directory: "/" # Location of package manifests
     schedule:
-      interval: "dayly"
+      interval: "daily"
     open-pull-requests-limit: 5
     ignore:
       # Calcite is updated manually
