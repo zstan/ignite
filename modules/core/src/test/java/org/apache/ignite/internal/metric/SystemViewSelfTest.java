@@ -82,11 +82,6 @@ import org.apache.ignite.internal.IgniteInternalFuture;
 import org.apache.ignite.internal.binary.mutabletest.GridBinaryTestClasses.TestObjectAllTypes;
 import org.apache.ignite.internal.binary.mutabletest.GridBinaryTestClasses.TestObjectEnum;
 import org.apache.ignite.internal.client.thin.ProtocolVersion;
-import org.apache.ignite.internal.managers.systemview.walker.BaselineNodeAttributeViewWalker;
-import org.apache.ignite.internal.managers.systemview.walker.CachePagesListViewWalker;
-import org.apache.ignite.internal.managers.systemview.walker.ClientConnectionAttributeViewWalker;
-import org.apache.ignite.internal.managers.systemview.walker.MetastorageViewWalker;
-import org.apache.ignite.internal.managers.systemview.walker.NodeAttributeViewWalker;
 import org.apache.ignite.internal.processors.cache.persistence.GridCacheDatabaseSharedManager;
 import org.apache.ignite.internal.processors.cache.persistence.IgniteCacheDatabaseSharedManager;
 import org.apache.ignite.internal.processors.cache.persistence.freelist.PagesList;
@@ -95,8 +90,13 @@ import org.apache.ignite.internal.processors.metric.impl.PeriodicHistogramMetric
 import org.apache.ignite.internal.processors.odbc.jdbc.JdbcConnectionContext;
 import org.apache.ignite.internal.processors.service.DummyService;
 import org.apache.ignite.internal.processors.task.GridInternal;
+import org.apache.ignite.internal.systemview.BaselineNodeAttributeViewWalker;
+import org.apache.ignite.internal.systemview.CachePagesListViewWalker;
+import org.apache.ignite.internal.systemview.ClientConnectionAttributeViewWalker;
+import org.apache.ignite.internal.systemview.MetastorageViewWalker;
+import org.apache.ignite.internal.systemview.NodeAttributeViewWalker;
+import org.apache.ignite.internal.thread.pool.IgniteStripedExecutor;
 import org.apache.ignite.internal.util.GridTestClockTimer;
-import org.apache.ignite.internal.util.StripedExecutor;
 import org.apache.ignite.internal.util.typedef.F;
 import org.apache.ignite.internal.util.typedef.T2;
 import org.apache.ignite.internal.util.typedef.internal.CU;
@@ -940,6 +940,7 @@ public class SystemViewSelfTest extends GridCommonAbstractTest {
 
             assertNotNull(row);
             assertTrue(row.logicalReads() > 0);
+            assertTrue(row.insertedBytes() > 0);
         }
     }
 
@@ -1929,7 +1930,7 @@ public class SystemViewSelfTest extends GridCommonAbstractTest {
      * @param view System view.
      * @param poolName Executor name.
      */
-    private void checkStripeExecutorView(StripedExecutor execSvc, SystemView<StripedExecutorTaskView> view,
+    private void checkStripeExecutorView(IgniteStripedExecutor execSvc, SystemView<StripedExecutorTaskView> view,
         String poolName) throws Exception {
         CountDownLatch latch = new CountDownLatch(1);
 
@@ -2571,17 +2572,15 @@ public class SystemViewSelfTest extends GridCommonAbstractTest {
     /** */
     @Test
     public void testConfigurationView() throws Exception {
-        IgniteConfiguration icfg = new IgniteConfiguration();
-
         long expMaxSize = 10 * MB;
 
         String expName = "my-instance";
 
         String expDrName = "my-dr";
 
-        icfg.setIgniteInstanceName(expName)
-            .setIncludeEventTypes(EVT_CONSISTENCY_VIOLATION);
-        icfg.setDataStorageConfiguration(new DataStorageConfiguration()
+        IgniteConfiguration icfg = getConfiguration(expName)
+            .setIncludeEventTypes(EVT_CONSISTENCY_VIOLATION)
+            .setDataStorageConfiguration(new DataStorageConfiguration()
             .setDefaultDataRegionConfiguration(
                 new DataRegionConfiguration()
                     .setLazyMemoryAllocation(false))

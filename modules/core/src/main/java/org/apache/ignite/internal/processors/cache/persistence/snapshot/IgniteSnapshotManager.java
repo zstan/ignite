@@ -104,7 +104,6 @@ import org.apache.ignite.internal.managers.communication.TransmissionPolicy;
 import org.apache.ignite.internal.managers.encryption.GroupKey;
 import org.apache.ignite.internal.managers.encryption.GroupKeyEncrypted;
 import org.apache.ignite.internal.managers.eventstorage.DiscoveryEventListener;
-import org.apache.ignite.internal.managers.systemview.walker.SnapshotViewWalker;
 import org.apache.ignite.internal.pagemem.PageIdUtils;
 import org.apache.ignite.internal.pagemem.store.PageStore;
 import org.apache.ignite.internal.pagemem.wal.IgniteWriteAheadLogManager;
@@ -154,6 +153,7 @@ import org.apache.ignite.internal.processors.configuration.distributed.Distribut
 import org.apache.ignite.internal.processors.marshaller.MappedName;
 import org.apache.ignite.internal.processors.metastorage.persistence.DistributedMetaStorageImpl;
 import org.apache.ignite.internal.processors.task.GridInternal;
+import org.apache.ignite.internal.systemview.SnapshotViewWalker;
 import org.apache.ignite.internal.util.BasicRateLimiter;
 import org.apache.ignite.internal.util.GridBusyLock;
 import org.apache.ignite.internal.util.GridCloseableIteratorAdapter;
@@ -181,6 +181,7 @@ import org.apache.ignite.lang.IgniteFuture;
 import org.apache.ignite.lang.IgniteUuid;
 import org.apache.ignite.marshaller.Marshaller;
 import org.apache.ignite.metric.MetricRegistry;
+import org.apache.ignite.plugin.extensions.communication.Message;
 import org.apache.ignite.resources.IgniteInstanceResource;
 import org.apache.ignite.spi.encryption.EncryptionSpi;
 import org.apache.ignite.spi.systemview.view.SnapshotView;
@@ -1070,7 +1071,7 @@ public class IgniteSnapshotManager extends GridCacheSharedManagerAdapter
                 );
 
                 SnapshotHandlerContext ctx = new SnapshotHandlerContext(meta, req.groups(), cctx.localNode(), snpOp.snapshotFileTree(),
-                    snpOp.streamerWarning(), true);
+                    snpOp.streamerWarning(), true, null, null);
 
                 snpOp.meta(meta);
 
@@ -1152,7 +1153,7 @@ public class IgniteSnapshotManager extends GridCacheSharedManagerAdapter
                     "Uncompleted snapshot will be deleted [err=" + err + ']'));
             }
 
-            completeHandlersAsyncIfNeeded(snpOp, res.values())
+            completeHandlersAsyncIfNeeded(snpOp, res)
                 .listen(f -> {
                         if (f.error() != null)
                             snpOp.error(f.error());
@@ -1194,7 +1195,7 @@ public class IgniteSnapshotManager extends GridCacheSharedManagerAdapter
     }
 
     /**
-     * Execute the {@link SnapshotHandler#complete(String, Collection)} method of the snapshot handlers asynchronously.
+     * Execute the {@link SnapshotHandler#complete(String, Map)} method of the snapshot handlers asynchronously.
      *
      * @param snpOp Snapshot creation operation.
      * @param res Results.
@@ -1202,22 +1203,23 @@ public class IgniteSnapshotManager extends GridCacheSharedManagerAdapter
      */
     private IgniteInternalFuture<Void> completeHandlersAsyncIfNeeded(
         SnapshotOperation snpOp,
-        Collection<SnapshotOperationResponse> res
+        Map<UUID, SnapshotOperationResponse> res
     ) {
         if (snpOp.error() != null)
             return new GridFinishedFuture<>();
 
         SnapshotOperationRequest req = snpOp.request();
 
-        Map<String, List<SnapshotHandlerResult<?>>> clusterHndResults = new HashMap<>();
+        Map<String, Map<UUID, SnapshotHandlerResult<?>>> clusterHndResults = new HashMap<>();
 
-        for (SnapshotOperationResponse snpRes : res) {
+        res.forEach((nodeId, snpRes) -> {
             if (snpRes == null || snpRes.handlerResults() == null)
-                continue;
+                return;
 
-            for (Map.Entry<String, SnapshotHandlerResult<Object>> entry : snpRes.handlerResults().entrySet())
-                clusterHndResults.computeIfAbsent(entry.getKey(), v -> new ArrayList<>()).add(entry.getValue());
-        }
+            snpRes.handlerResults().forEach((hndName, hndRes) ->
+                clusterHndResults.computeIfAbsent(hndName, v -> new HashMap<>())
+                    .put(nodeId, hndRes));
+        });
 
         if (clusterHndResults.isEmpty())
             return new GridFinishedFuture<>();
@@ -2387,7 +2389,7 @@ public class IgniteSnapshotManager extends GridCacheSharedManagerAdapter
         FilePageStore pageStore
     ) throws IgniteCheckedException {
         CacheObjectContext coctx = new CacheObjectContext(ctx, grpName, null, false,
-            false, false, false, false);
+            false, false, false);
 
         GridCacheSharedContext<?, ?> sctx = GridCacheSharedContext.builder().build(ctx, null);
 
@@ -2873,7 +2875,7 @@ public class IgniteSnapshotManager extends GridCacheSharedManagerAdapter
     /** Snapshot operation handlers. */
     protected static class SnapshotHandlers {
         /** Snapshot operation handlers. */
-        private final Map<SnapshotHandlerType, List<SnapshotHandler<Object>>> handlers = new EnumMap<>(SnapshotHandlerType.class);
+        private final Map<SnapshotHandlerType, List<SnapshotHandler<?>>> handlers = new EnumMap<>(SnapshotHandlerType.class);
 
         /** Executor service used to invoke handlers in parallel. */
         private ExecutorService execSvc;
@@ -2895,12 +2897,12 @@ public class IgniteSnapshotManager extends GridCacheSharedManagerAdapter
             registerHandler(new SnapshotPartitionsQuickVerifyHandler(ctx.cache().context()));
 
             // Register custom handlers.
-            SnapshotHandler<Object>[] extHnds = (SnapshotHandler<Object>[])ctx.plugins().extensions(SnapshotHandler.class);
+            SnapshotHandler<Message>[] extHnds = (SnapshotHandler<Message>[])ctx.plugins().extensions(SnapshotHandler.class);
 
             if (extHnds == null)
                 return;
 
-            for (SnapshotHandler<Object> extHnd : extHnds)
+            for (SnapshotHandler<Message> extHnd : extHnds)
                 registerHandler(extHnd);
         }
 
@@ -2910,17 +2912,17 @@ public class IgniteSnapshotManager extends GridCacheSharedManagerAdapter
          * @return Results from all handlers with the specified type.
          * @throws IgniteCheckedException if parallel execution was failed.
          */
-        protected @Nullable Map<String, SnapshotHandlerResult<Object>> invokeAll(
+        protected @Nullable Map<String, SnapshotHandlerResult<Message>> invokeAll(
             SnapshotHandlerType type,
             SnapshotHandlerContext ctx
         ) throws IgniteCheckedException {
-            List<SnapshotHandler<Object>> handlers = this.handlers.get(type);
+            List<SnapshotHandler<?>> handlers = this.handlers.get(type);
 
             if (F.isEmpty(handlers))
                 return null;
 
             if (handlers.size() == 1) {
-                SnapshotHandler<Object> hnd = handlers.get(0);
+                SnapshotHandler<?> hnd = handlers.get(0);
 
                 return F.asMap(hnd.getClass().getName(), invoke(hnd, ctx));
             }
@@ -2944,14 +2946,14 @@ public class IgniteSnapshotManager extends GridCacheSharedManagerAdapter
         protected void completeAll(
             SnapshotHandlerType type,
             String snpName,
-            Map<String, List<SnapshotHandlerResult<?>>> res,
+            Map<String, Map<UUID, SnapshotHandlerResult<?>>> res,
             Collection<UUID> reqNodes,
             Consumer<List<String>> wrnsHnd
         ) throws Exception {
             if (res.isEmpty())
                 return;
 
-            List<SnapshotHandler<Object>> hnds = handlers.get(type);
+            List<SnapshotHandler<?>> hnds = handlers.get(type);
 
             if (hnds == null || hnds.size() != res.size()) {
                 throw new IgniteCheckedException("Snapshot handlers configuration mismatch (number of local snapshot " +
@@ -2963,13 +2965,13 @@ public class IgniteSnapshotManager extends GridCacheSharedManagerAdapter
             List<String> wrns = new ArrayList<>();
 
             for (SnapshotHandler hnd : hnds) {
-                List<SnapshotHandlerResult<?>> nodesRes = res.get(hnd.getClass().getName());
+                Map<UUID, SnapshotHandlerResult<?>> nodesRes = res.get(hnd.getClass().getName());
 
                 if (nodesRes == null || nodesRes.size() < reqNodes.size()) {
                     Set<UUID> missing = new HashSet<>(reqNodes);
 
                     if (nodesRes != null)
-                        missing.removeAll(F.viewReadOnly(nodesRes, r -> r.node().id()));
+                        missing.removeAll(nodesRes.keySet());
 
                     throw new IgniteCheckedException("Snapshot handlers configuration mismatch, " +
                         "\"" + hnd.getClass().getName() + "\" handler is missing on the remote node(s). " +
@@ -2994,19 +2996,19 @@ public class IgniteSnapshotManager extends GridCacheSharedManagerAdapter
          * @param hnd Snapshot operation handler.
          * @param ctx Snapshot operation handler context.
          */
-        private SnapshotHandlerResult<Object> invoke(SnapshotHandler<Object> hnd, SnapshotHandlerContext ctx) {
+        private SnapshotHandlerResult<Message> invoke(SnapshotHandler<?> hnd, SnapshotHandlerContext ctx) {
             try {
-                return new SnapshotHandlerResult<>(hnd.invoke(ctx), null, ctx.localNode());
+                return new SnapshotHandlerResult<>(hnd.invoke(ctx), null);
             }
             catch (Exception e) {
                 U.error(null, "Error invoking snapshot handler", e);
 
-                return new SnapshotHandlerResult<>(null, e, ctx.localNode());
+                return new SnapshotHandlerResult<>(null, e);
             }
         }
 
         /** */
-        private void registerHandler(SnapshotHandler hnd) {
+        private void registerHandler(SnapshotHandler<?> hnd) {
             handlers.computeIfAbsent(hnd.type(), v -> new ArrayList<>()).add(hnd);
         }
     }
@@ -4118,65 +4120,6 @@ public class IgniteSnapshotManager extends GridCacheSharedManagerAdapter
             super.close();
 
             U.closeQuiet(idxIo);
-        }
-    }
-
-    /** */
-    private static class SnapshotOperationResponse implements Serializable {
-        /** Serial version uid. */
-        private static final long serialVersionUID = 0L;
-
-        /** Results of single-node handlers execution. */
-        private final Map<String, SnapshotHandlerResult<Object>> hndResults;
-
-        /** Default constructor. */
-        public SnapshotOperationResponse() {
-            this(null);
-        }
-
-        /** @param hndResults Results of single-node handlers execution.  */
-        public SnapshotOperationResponse(Map<String, SnapshotHandlerResult<Object>> hndResults) {
-            this.hndResults = hndResults;
-        }
-
-        /** @return Results of single-node handlers execution. */
-        public @Nullable Map<String, SnapshotHandlerResult<Object>> handlerResults() {
-            return hndResults;
-        }
-    }
-
-    /** Snapshot operation start message. */
-    private static class SnapshotStartDiscoveryMessage extends InitMessage<SnapshotOperationRequest>
-        implements SnapshotDiscoveryMessage {
-        /** Serial version UID. */
-        private static final long serialVersionUID = 0L;
-
-        /** */
-        private final boolean needExchange;
-
-        /**
-         * @param procId Unique process id.
-         * @param req Snapshot initial request.
-         */
-        public SnapshotStartDiscoveryMessage(UUID procId, SnapshotOperationRequest req) {
-            super(procId, START_SNAPSHOT, req, req.incremental());
-
-            needExchange = !req.incremental();
-        }
-
-        /** {@inheritDoc} */
-        @Override public boolean needExchange() {
-            return needExchange;
-        }
-
-        /** {@inheritDoc} */
-        @Override public boolean needAssignPartitions() {
-            return false;
-        }
-
-        /** {@inheritDoc} */
-        @Override public String toString() {
-            return S.toString(SnapshotStartDiscoveryMessage.class, this, super.toString());
         }
     }
 

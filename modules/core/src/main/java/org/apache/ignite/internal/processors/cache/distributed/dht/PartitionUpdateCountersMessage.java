@@ -23,29 +23,33 @@ import org.apache.ignite.internal.Order;
 import org.apache.ignite.internal.util.GridUnsafe;
 import org.apache.ignite.internal.util.typedef.internal.U;
 import org.apache.ignite.plugin.extensions.communication.Message;
+import org.apache.ignite.plugin.extensions.communication.MessageFactory;
 
 /**
  * Partition update counters message.
+ *
+ * @see #finishUpdating()
  */
 public class PartitionUpdateCountersMessage implements Message {
     /** */
     private static final int ITEM_SIZE = 4 /* partition */ + 8 /* initial counter */ + 8 /* updates count */;
 
-    /** Byte representation of partition counters. */
+    /** */
     @Order(0)
-    private byte[] data;
+    int cacheId;
 
-    /** */
+    /** Byte representation of partition counters. */
     @Order(1)
-    private int cacheId;
+    byte[] data;
 
     /** */
-    private int size;
+    @Order(2)
+    int size;
 
     /** Used for assigning counters to cache entries during tx finish. */
     private Map<Integer, Long> counters;
 
-    /** */
+    /** Empty constructor for a {@link MessageFactory}. */
     public PartitionUpdateCountersMessage() {
         // No-op.
     }
@@ -62,32 +66,10 @@ public class PartitionUpdateCountersMessage implements Message {
     }
 
     /**
-     * @return Data.
-     */
-    public byte[] data() {
-        return Arrays.copyOf(data, size * ITEM_SIZE);
-    }
-
-    /**
-     * @param data New data.
-     */
-    public void data(byte[] data) {
-        this.data = data;
-        size = data == null ? 0 : data.length / ITEM_SIZE;
-    }
-
-    /**
      * @return Cache id.
      */
     public int cacheId() {
         return cacheId;
-    }
-
-    /**
-     * @param cacheId New cache id.
-     */
-    public void cacheId(int cacheId) {
-        this.cacheId = cacheId;
     }
 
     /**
@@ -105,7 +87,7 @@ public class PartitionUpdateCountersMessage implements Message {
         if (idx >= size)
             throw new ArrayIndexOutOfBoundsException();
 
-        long off = GridUnsafe.BYTE_ARR_OFF + idx * ITEM_SIZE;
+        long off = GridUnsafe.BYTE_ARR_OFF + (long)idx * ITEM_SIZE;
 
         return GridUnsafe.getInt(data, off);
     }
@@ -118,7 +100,7 @@ public class PartitionUpdateCountersMessage implements Message {
         if (idx >= size)
             throw new ArrayIndexOutOfBoundsException();
 
-        long off = GridUnsafe.BYTE_ARR_OFF + idx * ITEM_SIZE + 4;
+        long off = GridUnsafe.BYTE_ARR_OFF + (long)idx * ITEM_SIZE + 4;
 
         return GridUnsafe.getLong(data, off);
     }
@@ -131,7 +113,7 @@ public class PartitionUpdateCountersMessage implements Message {
         if (idx >= size)
             throw new ArrayIndexOutOfBoundsException();
 
-        long off = GridUnsafe.BYTE_ARR_OFF + idx * ITEM_SIZE + 12;
+        long off = GridUnsafe.BYTE_ARR_OFF + (long)idx * ITEM_SIZE + 12;
 
         return GridUnsafe.getLong(data, off);
     }
@@ -140,15 +122,26 @@ public class PartitionUpdateCountersMessage implements Message {
      * @param part Partition number.
      * @param init Init partition counter.
      * @param updatesCnt Update counter delta.
+     *
+     * @see #finishUpdating()
      */
     public void add(int part, long init, long updatesCnt) {
         ensureSpace(size + 1);
 
-        long off = GridUnsafe.BYTE_ARR_OFF + size++ * ITEM_SIZE;
+        long off = GridUnsafe.BYTE_ARR_OFF + (long)size++ * ITEM_SIZE;
 
         GridUnsafe.putInt(data, off, part); off += 4;
         GridUnsafe.putLong(data, off, init); off += 8;
         GridUnsafe.putLong(data, off, updatesCnt);
+    }
+
+    /** Optimizes the memory used after adding counters with {@link #add(int, long, long)}. */
+    public void finishUpdating() {
+        if (data != null && data.length != size * ITEM_SIZE) {
+            assert data.length > size * ITEM_SIZE;
+
+            data = Arrays.copyOf(data, size * ITEM_SIZE);
+        }
     }
 
     /**
@@ -178,12 +171,7 @@ public class PartitionUpdateCountersMessage implements Message {
         int req = newSize * ITEM_SIZE;
 
         if (data.length < req)
-            data = Arrays.copyOf(data, data.length << 1);
-    }
-
-    /** {@inheritDoc} */
-    @Override public short directType() {
-        return 157;
+            data = Arrays.copyOf(data, (int)(data.length * 1.33f));
     }
 
     /** {@inheritDoc} */
