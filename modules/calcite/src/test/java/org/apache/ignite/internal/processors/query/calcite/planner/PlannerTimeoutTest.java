@@ -63,8 +63,10 @@ public class PlannerTimeoutTest extends AbstractPlannerTest {
         AtomicReference<RelOptPlanner.CannotPlanException> plannerError = new AtomicReference<>();
 
         GridTestUtils.assertTimeout(3 * PLANNER_TIMEOUT, TimeUnit.MILLISECONDS, () -> {
+            long start = System.currentTimeMillis();
             try (IgnitePlanner planner = ctx.planner()) {
                 plan.set(physicalPlan(planner, ctx.query()));
+                System.err.println("!!!final1 " + (System.currentTimeMillis() - start));
 
                 VolcanoPlanner volcanoPlanner = (VolcanoPlanner)ctx.cluster().getPlanner();
 
@@ -73,6 +75,7 @@ public class PlannerTimeoutTest extends AbstractPlannerTest {
                 GridTestUtils.assertThrowsWithCause(volcanoPlanner::checkCancel, VolcanoTimeoutException.class);
             }
             catch (RelOptPlanner.CannotPlanException e) {
+                System.err.println("!!!final2 " + (System.currentTimeMillis() - start));
                 plannerError.set(e);
             }
             catch (Exception e) {
@@ -103,6 +106,7 @@ public class PlannerTimeoutTest extends AbstractPlannerTest {
         RelCollation pkColl = TraitUtils.createCollation(Collections.singletonList(0));
         table.addIndex(new CacheIndexImpl(pkColl, "pk", null, table) {
             @Override public RelCollation collation() {
+                System.err.println("!!!doSleep");
                 doSleep(300);
 
                 return super.collation();
