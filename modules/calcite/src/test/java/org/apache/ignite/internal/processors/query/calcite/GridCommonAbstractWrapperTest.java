@@ -17,14 +17,26 @@
 
 package org.apache.ignite.internal.processors.query.calcite;
 
+import org.apache.ignite.internal.util.typedef.internal.U;
 import org.apache.ignite.testframework.junits.common.GridCommonAbstractTest;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.TestInstance;
 
 /** */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class GridCommonAbstractWrapperTest extends GridCommonAbstractTest {
+    /** */
+    @BeforeEach
+    void printTestName(TestInfo testInfo) {
+        // Get and print the display name of the upcoming test
+        String testName = testInfo.getDisplayName();
+        String testCls = testInfo.getTestClass().orElse(Object.class).getSimpleName();
+        U.quietAndInfo(log(), ">>> Starting test: " + testCls + "#" + testName + " <<<");
+    }
+
     /** */
     @BeforeAll
     void init() {
