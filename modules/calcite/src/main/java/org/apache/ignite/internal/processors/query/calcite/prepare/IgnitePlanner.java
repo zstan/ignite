@@ -803,7 +803,7 @@ public class IgnitePlanner implements Planner, RelOptTable.ViewExpander {
             if (timeout > 0) {
                 long startTs = ctx.startTs();
 
-                System.err.println("!!!checkCancel: " + (U.currentTimeMillis() - startTs));
+                System.err.println("!!!checkCancel: " + (U.currentTimeMillis() - startTs) + " " + ctx.hashCode() + " " + System.currentTimeMillis());
 
                 if (U.currentTimeMillis() - startTs > timeout)
                     cancelFlag.set(true);

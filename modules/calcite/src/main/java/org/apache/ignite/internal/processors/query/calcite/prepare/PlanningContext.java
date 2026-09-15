@@ -81,6 +81,7 @@ public final class PlanningContext implements Context {
 
         this.parentCtx = parentCtx;
         startTs = U.currentTimeMillis();
+        System.err.println("startTs = U.currentTimeMillis()");
         this.plannerTimeout = plannerTimeout;
     }
 
