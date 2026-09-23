@@ -302,11 +302,11 @@ public enum PlannerPhase {
                     LogicalOrToUnionRule.INSTANCE,
 
                     // TODO: https://issues.apache.org/jira/browse/IGNITE-16334 join rules ordering is significant here.
-                    MergeJoinConverterRule.INSTANCE,
                     CorrelatedNestedLoopJoinRule.INSTANCE,
                     CorrelateToNestedLoopRule.INSTANCE,
                     NestedLoopJoinConverterRule.INSTANCE,
                     HashJoinConverterRule.INSTANCE,
+                    MergeJoinConverterRule.INSTANCE,
 
                     // This rule replaces input refs to literals in the window agg calls.
                     // Since ignite aggregate calculation bounded to input field index - this rule should be excluded from rule set.
