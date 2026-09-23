@@ -23,11 +23,13 @@ import java.util.Collections;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.calcite.plan.RelOptRuleCall;
+import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.plan.volcano.RelSubset;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Join;
@@ -36,6 +38,8 @@ import org.apache.calcite.rel.hint.RelHint;
 import org.apache.calcite.rel.logical.LogicalJoin;
 import org.apache.ignite.internal.processors.query.calcite.hint.HintDefinition;
 import org.apache.ignite.internal.processors.query.calcite.hint.HintUtils;
+import org.apache.ignite.internal.processors.query.calcite.rel.IgniteConvention;
+import org.apache.ignite.internal.processors.query.calcite.trait.TraitsAwareIgniteRel;
 import org.apache.ignite.internal.util.typedef.F;
 
 import static org.apache.calcite.util.Util.last;
@@ -84,6 +88,71 @@ abstract class AbstractIgniteJoinConverterRule extends AbstractIgniteConverterRu
     /** {@inheritDoc} */
     @Override public final boolean matches(RelOptRuleCall call) {
         return super.matches(call) && matchesJoin(call) && !disabledByHints(call.rel(0));
+    }
+
+    /** {@inheritDoc} */
+    @Override public void onMatch(RelOptRuleCall call) {
+        LogicalJoin join = call.rel(0);
+
+        if (!join.getTraitSet().contains(getInTrait()))
+            return;
+
+        RelNode converted = convert(join);
+
+        if (converted == null)
+            return;
+
+        call.transformTo(converted);
+
+        emitDeliveredVariants(call, converted);
+    }
+
+    /**
+     * Registers the variants of the converted join that can be derived from the traits (distribution, collation,
+     * rewindability, correlation) its inputs have already delivered.
+     * <p>
+     * The top-down driver derives such variants itself ({@code DeriveTrait} task), but only for physical nodes that
+     * exist when the subset of the join with default traits is optimized. Several converter rules match the same
+     * {@link LogicalJoin}, they fire one after another, and every join implementation produced after the subset has
+     * been optimized never gets its {@code DeriveTrait} task: the driver only passes the required traits of the subsets
+     * being optimized at that moment (usually {@code single}) through it. As a result an equi-join on affinity keys
+     * gets its colocated (affinity distributed) variant only if its converter rule happens to fire first.
+     * <p>
+     * To make the join implementations independent of the rule order the converter derives the variants on its own.
+     * If an input has nothing delivered yet the derivation is skipped, in that case the driver derives the variants later.
+     *
+     * @param call Rule call.
+     * @param converted Converted join with default traits.
+     */
+    private static void emitDeliveredVariants(RelOptRuleCall call, RelNode converted) {
+        if (!(converted instanceof TraitsAwareIgniteRel))
+            return;
+
+        // Default trait set is not interesting, DeriveTrait skips it too.
+        RelTraitSet dfltTraits = converted.getCluster().traitSet();
+
+        List<List<RelTraitSet>> inTraits = new ArrayList<>(converted.getInputs().size());
+
+        for (RelNode input : converted.getInputs()) {
+            if (!(input instanceof RelSubset))
+                return;
+
+            List<RelTraitSet> delivered = ((RelSubset)input).getRelList().stream()
+                .filter(rel -> rel.getConvention() == IgniteConvention.INSTANCE)
+                .map(RelNode::getTraitSet)
+                .filter(traits -> !traits.equalsSansConvention(dfltTraits))
+                .distinct()
+                .collect(Collectors.toList());
+
+            // Input is not optimized yet, the driver derives the variants after it is.
+            if (delivered.isEmpty())
+                return;
+
+            inTraits.add(delivered);
+        }
+
+        for (RelNode variant : ((TraitsAwareIgniteRel)converted).derive(inTraits))
+            call.transformTo(variant);
     }
 
     /** */
